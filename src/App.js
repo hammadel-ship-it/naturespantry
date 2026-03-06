@@ -35,20 +35,40 @@ const buildPrompt = (user) => {
 ${allergy}
 ${history}
 
-IMPORTANT: Respond with ONLY a single valid JSON object. No markdown fences. No text before or after. No comments inside JSON. No trailing commas. Use only double quotes for strings. Escape any double quotes inside string values with backslash.
+Respond with ONLY a valid JSON object. No markdown. No text outside JSON. No trailing commas. Double quotes only.
 
-The JSON must follow this exact shape:
-{"acknowledgment":"string","foods":[{"name":"string","emoji":"string","benefit":"string"}],"recipes":[{"name":"string","emoji":"string","ingredients":["string"],"steps":["string"]}],"tip":"string","weekPlan":[{"day":"string","focus":"string","breakfast":"string","lunch":"string","dinner":"string","snack":"string"}]}
+Exact shape:
+{"acknowledgment":"string","foods":[{"name":"string","emoji":"string","benefit":"string"}],"recipes":[{"name":"string","emoji":"string","ingredients":["string"],"steps":["string"]}],"tip":"string"}
 
 Rules:
-- acknowledgment: 2-3 warm sentences referencing the user's exact words
-- foods: 4-5 items, include global superfoods and herbs beyond obvious choices
-- recipes: 2 recipes max, under 10 mins, whole ingredients only
+- acknowledgment: 2-3 warm sentences referencing the user exact words
+- foods: 4-5 items, global superfoods and herbs beyond obvious choices
+- recipes: exactly 2, under 10 mins, whole ingredients only, max 3 steps each
 - tip: one hyper-specific actionable tip
-- weekPlan: exactly 7 days (Monday through Sunday), each meal addressing their concern preventively
 - ${allergy}
-- Keep ALL string values on one line, no newlines inside strings
-- If follow-up question, use conversation context`;
+- No newlines inside string values
+- If follow-up, use conversation context`;
+};
+
+const buildWeekPlanPrompt = (user, concern) => {
+  const allergy = user?.allergies?.length
+    ? `CRITICAL: User is allergic to ${user.allergies.join(", ")}. NEVER include these or derivatives.`
+    : "";
+  return `You are a nutritionist creating a 7-day preventive meal plan.
+
+User concern: "${concern}"
+${allergy}
+
+Respond with ONLY a valid JSON array of exactly 7 objects. No markdown. No text outside JSON. No trailing commas.
+
+Exact shape:
+[{"day":"Monday","focus":"word","breakfast":"meal","lunch":"meal","dinner":"meal","snack":"snack"},{"day":"Tuesday","focus":"word","breakfast":"meal","lunch":"meal","dinner":"meal","snack":"snack"},{"day":"Wednesday","focus":"word","breakfast":"meal","lunch":"meal","dinner":"meal","snack":"snack"},{"day":"Thursday","focus":"word","breakfast":"meal","lunch":"meal","dinner":"meal","snack":"snack"},{"day":"Friday","focus":"word","breakfast":"meal","lunch":"meal","dinner":"meal","snack":"snack"},{"day":"Saturday","focus":"word","breakfast":"meal","lunch":"meal","dinner":"meal","snack":"snack"},{"day":"Sunday","focus":"word","breakfast":"meal","lunch":"meal","dinner":"meal","snack":"snack"}]
+
+Rules:
+- focus: one evocative word theme per day
+- Each meal: concise, specific, addresses the concern
+- No newlines inside strings
+- ${allergy}`;
 };
 
 // ─── STORAGE ──────────────────────────────────────────────────────────────────
@@ -93,21 +113,20 @@ const CSS = `
 
 // ─── SAFE JSON PARSER ─────────────────────────────────────────────────────────
 
-function safeParseJSON(raw) {
-  // 1. strip markdown fences
+function safeParseJSON(raw, expectArray=false) {
   let s = raw.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/i,"").trim();
-  // 2. extract outermost { }
-  const start = s.indexOf("{");
-  const end   = s.lastIndexOf("}");
-  if (start === -1 || end === -1) throw new Error("No JSON object found in response.");
-  s = s.slice(start, end + 1);
-  // 3. attempt direct parse
+  if (expectArray) {
+    const a = s.indexOf("["), b = s.lastIndexOf("]");
+    if (a !== -1 && b !== -1) s = s.slice(a, b+1);
+  } else {
+    const a = s.indexOf("{"), b = s.lastIndexOf("}");
+    if (a !== -1 && b !== -1) s = s.slice(a, b+1);
+  }
+  if (!s) throw new Error("No JSON found in response.");
   try { return JSON.parse(s); } catch(_) {}
-  // 4. fallback: remove trailing commas before ] or }
   s = s.replace(/,\s*([}\]])/g, "$1");
-  // 5. attempt again
   try { return JSON.parse(s); } catch(_) {}
-  // 6. last resort: replace unescaped newlines inside strings
+  // last resort: replace unescaped newlines inside strings
   s = s.replace(/("(?:[^"\\]|\\.)*")|(\n)/g, (m,str,nl) => str ? str : " ");
   return JSON.parse(s);
 }
@@ -558,6 +577,39 @@ export default function App() {
     }
   };
 
+  // ── fetch week plan in background after main result ──
+  const fetchWeekPlan = async (concern, existingResult) => {
+    try {
+      const cu = userRef.current;
+      const res = await fetch("/.netlify/functions/chat", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens: 1800,
+          system: buildWeekPlanPrompt(cu, concern),
+          messages:[{role:"user", content:`Create a 7-day meal plan for someone with this concern: ${concern}`}],
+        }),
+      });
+      if (!res.ok) return;
+      const data = JSON.parse(await res.text());
+      const raw  = (data.content||[]).map(b=>b.text||"").join("").trim();
+      const plan = safeParseJSON(raw, true);
+      if (!Array.isArray(plan) || plan.length === 0) return;
+      // inject weekPlan into last assistant message
+      setMessages(p => {
+        const updated = [...p];
+        for (let i = updated.length-1; i >= 0; i--) {
+          if (updated[i].role === "assistant" && updated[i].result) {
+            updated[i] = {...updated[i], result:{...updated[i].result, weekPlan: plan}};
+            break;
+          }
+        }
+        return updated;
+      });
+    } catch(_) { /* week plan is optional — silently skip on error */ }
+  };
+
   // ── main query ──
   const handleQuery = async (query) => {
     const q = query.trim(); if (!q || loading) return;
@@ -589,13 +641,14 @@ export default function App() {
     setInput(""); setError(null); setLoading(true);
 
     try {
+      // ── Step 1: main response (fast, small JSON) ──
       const res = await fetch("/.netlify/functions/chat", {
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           model:"claude-sonnet-4-20250514",
-          max_tokens: 3500,
-          system: buildPrompt(user),
+          max_tokens: 1200,
+          system: buildPrompt(userRef.current),
           messages: apiMessages,
         }),
       });
@@ -607,11 +660,14 @@ export default function App() {
       const raw  = (data.content||[]).map(b=>b.text||"").join("").trim();
       if (!raw) throw new Error("Empty response from AI.");
 
-      const result = safeParseJSON(raw);
+      const result = safeParseJSON(raw, false);
       if (!result.acknowledgment) throw new Error("Unexpected response shape.");
 
       setMessages(p=>[...p,{role:"assistant",content:result.acknowledgment,result}]);
       recordSuccess(isFollowUp, q);  // atomic: deduct credit + save history
+
+      // ── Step 2: fetch 7-day plan separately in background ──
+      fetchWeekPlan(q, result);
     } catch(e) {
       setError(e.message);
     } finally {
