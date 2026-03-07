@@ -560,6 +560,52 @@ function ChipSection({ onQuery }) {
   );
 }
 
+// ─── LOGO SVG ─────────────────────────────────────────────────────────────────
+
+function FnfLogo({ size = 40, animated = false }) {
+  const s = size;
+  return (
+    <svg width={s} height={s} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"
+      style={{display:"block", flexShrink:0, animation: animated ? "float 5s ease-in-out infinite" : "none"}}>
+
+      {/* ── Apple body outline (heart-shaped bottom, rounded top) ── */}
+      <path
+        d="M50 88 C28 72 14 56 14 40 C14 26 24 18 36 20 C41 21 46 24 50 28 C54 24 59 21 64 20 C76 18 86 26 86 40 C86 56 72 72 50 88Z"
+        fill="none"
+        stroke="#22a35a"
+        strokeWidth="5"
+        strokeLinejoin="round"
+      />
+
+      {/* ── Leaf ── */}
+      <ellipse cx="44" cy="13" rx="6" ry="10" transform="rotate(-30 44 13)" fill="#22a35a" opacity="0.9"/>
+
+      {/* ── Stem ── */}
+      <path d="M50 20 C50 17 48 13 46 11" stroke="#4a7a56" strokeWidth="2.5" strokeLinecap="round"/>
+
+      {/* ── Fork (left) ── */}
+      {/* tines */}
+      <line x1="33" y1="34" x2="33" y2="42" stroke="#4ec97a" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="36" y1="34" x2="36" y2="42" stroke="#4ec97a" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="39" y1="34" x2="39" y2="42" stroke="#4ec97a" strokeWidth="2" strokeLinecap="round"/>
+      {/* neck */}
+      <path d="M33 42 Q36 46 36 50 L36 62" stroke="#4ec97a" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+
+      {/* ── Dumbbell (right) ── */}
+      {/* bar */}
+      <line x1="55" y1="48" x2="72" y2="48" stroke="#a8ddb5" strokeWidth="3" strokeLinecap="round"/>
+      {/* left weight plate */}
+      <rect x="52" y="42" width="6" height="12" rx="2" fill="#5a9a6a"/>
+      {/* right weight plate */}
+      <rect x="69" y="42" width="6" height="12" rx="2" fill="#5a9a6a"/>
+      {/* left collar */}
+      <rect x="57" y="44" width="3" height="8" rx="1" fill="#22a35a"/>
+      {/* right collar */}
+      <rect x="67" y="44" width="3" height="8" rx="1" fill="#22a35a"/>
+    </svg>
+  );
+}
+
 export default function App() {
   const [page,setPage]=useState("home");
   const [user,setUser]=useState(getUser);
@@ -644,14 +690,12 @@ export default function App() {
 
         {/* NAV */}
         <nav style={{padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid rgba(80,180,100,.07)"}}>
-          <button onClick={reset} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:20,display:"inline-block",animation:hasConvo?"none":"float 4s ease-in-out infinite"}}>🥗</span>
+          <button onClick={reset} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
+            <FnfLogo size={36} animated={!hasConvo}/>
             <span style={{color:"#5a9a6a",fontSize:"clamp(.9rem,1.4vw,1.05rem)",letterSpacing:".03em",fontWeight:600}}>foodnfitness<span style={{color:"#22a35a"}}>.ai</span></span>
           </button>
           <div style={{display:"flex",gap:7,alignItems:"center"}}>
-            <div style={{display:"flex",gap:3,marginRight:6,opacity:.55}}>
-              {Object.values(PILLAR_META).map(m=><span key={m.icon} style={{fontSize:13}} title={m.label}>{m.icon}</span>)}
-            </div>
+
             <button onClick={()=>setPage("pricing")} style={{background:"none",border:"1px solid rgba(80,180,100,.17)",borderRadius:20,padding:"clamp(6px,.7vw,9px) clamp(14px,1.6vw,22px)",color:"#2e5535",fontSize:"clamp(.82rem,1.2vw,.95rem)",cursor:"pointer"}}>Pricing</button>
             {user
               ?<button onClick={()=>setShowProfile(true)} style={{background:"rgba(34,163,90,.1)",border:"1px solid rgba(34,163,90,.24)",borderRadius:20,padding:"4px 12px",color:"#4ec97a",fontSize:".78rem",cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
@@ -667,10 +711,8 @@ export default function App() {
         {!hasConvo&&(
           <div style={{animation:"fadeUp .45s ease"}}>
             <div style={{textAlign:"center",padding:"clamp(36px,6vw,72px) clamp(24px,8vw,120px) clamp(20px,3vw,36px)"}}>
-              <div style={{display:"flex",justifyContent:"center",gap:8,marginBottom:18}}>
-                {Object.values(PILLAR_META).map((m,i)=>(
-                  <div key={i} style={{width:46,height:46,borderRadius:13,background:m.bg,border:"1px solid "+m.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,animation:"float "+(4+i*.4)+"s ease-in-out infinite"}}>{m.icon}</div>
-                ))}
+              <div style={{display:"flex",justifyContent:"center",marginBottom:18}}>
+                <FnfLogo size={80} animated={true}/>
               </div>
               <h1 style={{fontSize:"clamp(2.2rem,5vw,4.2rem)",fontWeight:400,color:"#a8ddb5",margin:"0 0 10px",letterSpacing:"-.02em"}}>How are you feeling today?</h1>
               <p style={{color:"#3a6644",fontSize:"clamp(1rem,1.9vw,1.2rem)",fontStyle:"italic",margin:"0 0 6px"}}>Food · Fitness · Breathwork · Sleep</p>
