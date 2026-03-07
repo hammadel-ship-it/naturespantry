@@ -55,7 +55,7 @@ ${allergy}
 ${history}
 ${sexNote}
 
-Respond with ONLY a valid JSON object. No markdown. No text outside JSON. No trailing commas. Double quotes only. No newlines inside string values.
+Respond with ONLY a valid JSON object. No markdown. No text outside JSON. No trailing commas. Double quotes only. No newlines inside string values. No apostrophes inside string values — rephrase to avoid them.
 
 Shape: {"responseType":"initial","acknowledgment":"string","pillars":[{"type":"food|exercise|breath|sleep","label":"string","items":[{"emoji":"string","name":"string","benefit":"string"}]}],"recipes":[{"name":"string","emoji":"string","ingredients":["string"],"steps":["string"]}],"tip":"string"}
 
@@ -75,7 +75,7 @@ Rules:
 ${allergy}
 ${sexNote}
 
-Respond ONLY valid JSON. No markdown. No text outside JSON. No trailing commas. Double quotes. No newlines in strings.
+Respond ONLY valid JSON. No markdown. No text outside JSON. No trailing commas. Double quotes only. No newlines in strings. No apostrophes inside string values — rephrase to avoid them.
 
 Pick best shape:
 More items: {"responseType":"items","acknowledgment":"string","pillars":[{"type":"food|exercise|breath|sleep","label":"string","items":[{"emoji":"string","name":"string","benefit":"string"}]}],"tip":"string"}
@@ -109,7 +109,7 @@ Shape: [{"day":"Monday","focus":"word","food":"meal","move":"exercise with durat
 - move: specific exercise with duration e.g. "10 min morning yoga flow"
 - breathe: specific technique with reps e.g. "4-7-8 breathing 5 rounds"
 - sleep: specific tip with timing e.g. "No screens 90 mins before bed"
-- No newlines inside strings
+- No newlines inside strings. No apostrophes or single quotes inside string values — rephrase to avoid them. No unescaped special characters.
 - ${allergy}`;
 };
 
@@ -168,15 +168,48 @@ const CSS = `
 `;
 
 function safeParseJSON(raw, expectArray=false) {
+  // 1. Strip markdown fences
   let s = raw.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/i,"").trim();
+
+  // 2. Extract outermost { } or [ ]
   if (expectArray) { const a=s.indexOf("["),b=s.lastIndexOf("]"); if(a!==-1&&b!==-1)s=s.slice(a,b+1); }
   else             { const a=s.indexOf("{"),b=s.lastIndexOf("}"); if(a!==-1&&b!==-1)s=s.slice(a,b+1); }
   if (!s) throw new Error("No JSON found.");
+
+  // 3. Try raw
   try{return JSON.parse(s);}catch(_){}
+
+  // 4. Fix trailing commas before } or ]
   s=s.replace(/,\s*([}\]])/g,"$1");
   try{return JSON.parse(s);}catch(_){}
-  s=s.replace(/(\"(?:[^\"\\]|\\.)*\")|(\\n)/g,(m,str,nl)=>str?str:" ");
-  return JSON.parse(s);
+
+  // 5. Replace literal newlines inside strings with space
+  s=s.replace(/"([^"]*)"/g,(_,inner)=>'"'+inner.replace(/\n/g," ").replace(/\r/g,"")+'"');
+  try{return JSON.parse(s);}catch(_){}
+
+  // 6. Remove control characters that break JSON
+  s=s.replace(/[\x00-\x1F\x7F]/g,(c)=>{
+    if(c==="\n"||c==="\r"||c==="\t")return " ";
+    return "";
+  });
+  try{return JSON.parse(s);}catch(_){}
+
+  // 7. Fix unescaped quotes inside string values — replace " that aren't preceded by : [ , { with \"
+  s=s.replace(/:\s*"(.*?)(?<!\\)"/gs,(_,inner)=>':"'+inner.replace(/(?<!\\)"/g,'\\"')+'"');
+  try{return JSON.parse(s);}catch(_){}
+
+  // 8. Last resort: strip everything after last valid closing bracket
+  const lastCurly = s.lastIndexOf("}");
+  const lastSquare = s.lastIndexOf("]");
+  const lastClose = Math.max(lastCurly, lastSquare);
+  if (lastClose > 0) {
+    const trimmed = s.slice(0, lastClose+1);
+    try{return JSON.parse(trimmed);}catch(_){}
+    // Also try fixing trailing commas on trimmed version
+    try{return JSON.parse(trimmed.replace(/,\s*([}\]])/g,"$1"));}catch(_){}
+  }
+
+  throw new Error("Could not parse AI response as JSON.");
 }
 
 function Modal({ onClose, children, maxWidth=420 }) {
