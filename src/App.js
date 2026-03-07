@@ -55,40 +55,71 @@ ${allergy}
 ${history}
 ${sexNote}
 
-Respond with ONLY a valid JSON object. No markdown. No text outside JSON. No trailing commas. Double quotes only. No newlines inside string values. No apostrophes inside string values — rephrase to avoid them.
+CRITICAL: Respond with ONLY a raw JSON object. Absolutely no markdown, no backticks, no text before or after the JSON. No trailing commas. Double quotes only. No newlines inside string values. No apostrophes inside string values.
 
-Shape: {"responseType":"initial","acknowledgment":"string","pillars":[{"type":"food|exercise|breath|sleep","label":"string","items":[{"emoji":"string","name":"string","benefit":"string"}]}],"recipes":[{"name":"string","emoji":"string","ingredients":["string"],"steps":["string"]}],"tip":"string"}
+The pillar type field must be exactly one of these four words: food, exercise, breath, sleep.
+
+Required JSON structure:
+{
+  "responseType": "initial",
+  "acknowledgment": "2-3 warm sentences referencing their exact words",
+  "pillars": [
+    {
+      "type": "food",
+      "label": "Food and Nutrition",
+      "items": [
+        {"emoji": "🫐", "name": "Blueberries", "benefit": "Rich in antioxidants that reduce inflammation"}
+      ]
+    }
+  ],
+  "recipes": [
+    {
+      "name": "Recipe name",
+      "emoji": "🥣",
+      "ingredients": ["ingredient 1", "ingredient 2"],
+      "steps": ["Step one", "Step two", "Step three"]
+    }
+  ],
+  "tip": "One specific actionable tip"
+}
 
 Rules:
-- responseType always "initial"
-- acknowledgment: 2-3 warm sentences referencing exact words, mention which pillars addressed
-- pillars: 2-4 most relevant pillars. Each has type (food/exercise/breath/sleep), short label, 3-5 items with emoji+name+benefit
-- Food items: specific foods/herbs/superfoods with one-sentence benefit
-- Exercise items: specific movements with duration or reps in benefit field
-- Breath items: named breathing techniques with how-to in benefit field
-- Sleep items: specific sleep practices with timing in benefit field
-- recipes: 2 if food pillar present, else 1 wellness protocol as steps. Max 3 steps each
-- tip: one hyper-specific tip combining pillars
+- Include 2 to 4 pillars most relevant to the query
+- Each pillar has 3 to 5 items
+- Food items: specific foods or herbs with one sentence benefit
+- Exercise items: specific movements with duration or reps in benefit
+- Breath items: named breathing techniques with how-to in benefit
+- Sleep items: specific sleep practices with timing in benefit
+- Include 2 recipes if food pillar present, otherwise 1 wellness protocol written as steps
+- Max 3 steps per recipe
 - ${allergy}`;
   } else {
-    return `You are a warm holistic wellness coach continuing a conversation. Cover food, exercise, breathwork, sleep as relevant.
+    return `You are a warm holistic wellness coach continuing a conversation. Cover food, exercise, breathwork and sleep as relevant.
 ${allergy}
 ${sexNote}
 
-Respond ONLY valid JSON. No markdown. No text outside JSON. No trailing commas. Double quotes only. No newlines in strings. No apostrophes inside string values — rephrase to avoid them.
+CRITICAL: Respond with ONLY a raw JSON object. No markdown, no backticks, no text outside JSON. No trailing commas. Double quotes only. No newlines inside string values. No apostrophes inside string values.
 
-Pick best shape:
-More items: {"responseType":"items","acknowledgment":"string","pillars":[{"type":"food|exercise|breath|sleep","label":"string","items":[{"emoji":"string","name":"string","benefit":"string"}]}],"tip":"string"}
-How-to: {"responseType":"recipe","acknowledgment":"string","recipes":[{"name":"string","emoji":"string","ingredients":["string"],"steps":["string"]}],"tip":"string"}
-Deeper insight: {"responseType":"insight","acknowledgment":"string","cards":[{"emoji":"string","title":"string","body":"string","pillar":"food|exercise|breath|sleep"}],"tip":"string"}
-Specific answer: {"responseType":"answer","acknowledgment":"string","cards":[{"emoji":"string","title":"string","body":"string","pillar":"food|exercise|breath|sleep"}],"tip":"string"}
+The pillar type field must be exactly one of these four words: food, exercise, breath, sleep.
+
+Choose the best response type based on the follow-up question:
+
+For more foods or practices, use this structure:
+{"responseType": "items", "acknowledgment": "1-2 warm sentences", "pillars": [{"type": "food", "label": "Foods", "items": [{"emoji": "🌿", "name": "Name", "benefit": "Benefit"}]}], "tip": "specific tip"}
+
+For a recipe or how-to protocol:
+{"responseType": "recipe", "acknowledgment": "1-2 warm sentences", "recipes": [{"name": "Name", "emoji": "🥣", "ingredients": ["item"], "steps": ["step"]}], "tip": "specific tip"}
+
+For deeper lifestyle insight:
+{"responseType": "insight", "acknowledgment": "1-2 warm sentences", "cards": [{"emoji": "🌿", "title": "Short title", "body": "1-2 sentences", "pillar": "food"}], "tip": "specific tip"}
+
+For a specific question answered:
+{"responseType": "answer", "acknowledgment": "1-2 warm sentences", "cards": [{"emoji": "🌿", "title": "Short title", "body": "1-2 sentences", "pillar": "food"}], "tip": "specific tip"}
 
 Rules:
-- acknowledgment: 1-2 warm sentences referencing their exact follow-up
-- cards: 3-5 cards, each emoji + bold 3-5 word title + 1-2 sentence body + pillar type for colour
-- tip: hyper-specific to follow-up
-- ${allergy}
-- Every response visually rich: emojis, specific names, concrete detail`;
+- 3 to 5 items or cards per response
+- Every response visually rich with emojis and concrete detail
+- ${allergy}`;
   }
 };
 
@@ -762,7 +793,7 @@ export default function App() {
     apiMessages.push({role:"user",content:q});
     setMessages(p=>[...p,{role:"user",content:q}]);setInput("");setError(null);setLoading(true);
     try{
-      const res=await fetch("/.netlify/functions/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1400,system:buildPrompt(userRef.current,isFollowUp),messages:apiMessages})});
+      const res=await fetch("/.netlify/functions/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,system:buildPrompt(userRef.current,isFollowUp),messages:apiMessages})});
       const text=await res.text();
       if(!res.ok)throw new Error("Server error "+res.status+": "+text.slice(0,180));
       const data=JSON.parse(text);
