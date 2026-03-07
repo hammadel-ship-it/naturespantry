@@ -549,16 +549,101 @@ function RecipeList({ recipes, activeRecipe, setActiveRecipe, msgIdx }) {
 
 function ResultCard({ result, isLast, onGetMore, activeRecipe, setActiveRecipe, msgIdx }) {
   if(!result)return null;
-  const type=result.responseType||"initial";
-  const moreBtn=isLast&&<div style={{textAlign:"right",marginTop:6}}><button onClick={onGetMore} style={{background:"none",border:"none",color:"#3a6644",fontSize:".8rem",cursor:"pointer",fontStyle:"italic"}}>Get more searches →</button></div>;
-  if(type==="initial")return(<div style={{animation:"slideUp .3s ease"}}><AckBubble text={result.acknowledgment}/><PillarGrid pillars={result.pillars}/><RecipeList recipes={result.recipes} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx}/><TipRow tip={result.tip}/>{isLast&&<WeekPlan plan={result.weekPlan}/>}{moreBtn}</div>);
-  if(type==="items")return(<div style={{animation:"slideUp .3s ease"}}><AckBubble text={result.acknowledgment} label="More for you"/><PillarGrid pillars={result.pillars}/><TipRow tip={result.tip}/>{moreBtn}</div>);
-  if(type==="recipe")return(<div style={{animation:"slideUp .3s ease"}}><AckBubble text={result.acknowledgment} label="Here is how"/><RecipeList recipes={result.recipes} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx}/><TipRow tip={result.tip}/>{moreBtn}</div>);
-  if(type==="insight"||type==="answer"){
-    const label=type==="insight"?"Here is the deeper picture":"To answer your question";
-    return(<div style={{animation:"slideUp .3s ease"}}><AckBubble text={result.acknowledgment} label={label}/>{result.cards?.length>0&&<div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:14}}>{result.cards.map((card,i)=>{const meta=PILLAR_META[card.pillar]||PILLAR_META.food;return(<div key={i} style={{display:"flex",gap:14,alignItems:"flex-start",background:meta.bg,border:"1px solid "+meta.border,borderRadius:14,padding:"14px 16px",animation:"fadeUp .25s ease "+(i*.07)+"s both"}}><div style={{fontSize:"clamp(24px,2.8vw,30px)",lineHeight:1,flexShrink:0,marginTop:2}}>{card.emoji||"🌿"}</div><div><div style={{color:meta.color,fontSize:"clamp(.88rem,1.4vw,1rem)",fontWeight:600,marginBottom:4}}>{card.title}</div><div style={{color:"#6aaa80",fontSize:"clamp(.82rem,1.3vw,.95rem)",lineHeight:1.65}}>{card.body}</div></div></div>);})}</div>}<TipRow tip={result.tip}/>{moreBtn}</div>);
+  // Guard: if result has no acknowledgment at all, don't render a broken card
+  if(!result.acknowledgment && !result.pillars && !result.cards && !result.recipes) return null;
+
+  const type = result.responseType || "initial";
+  const moreBtn = isLast && (
+    <div style={{textAlign:"right",marginTop:6}}>
+      <button onClick={onGetMore} style={{background:"none",border:"none",color:"#3a6644",fontSize:".8rem",cursor:"pointer",fontStyle:"italic"}}>Get more searches →</button>
+    </div>
+  );
+
+  // Safe acknowledgment — fall back to empty string so AckBubble doesn't crash
+  const ack = result.acknowledgment || "";
+
+  if(type==="initial") return(
+    <div style={{animation:"slideUp .3s ease"}}>
+      {ack && <AckBubble text={ack}/>}
+      <PillarGrid pillars={result.pillars||[]}/>
+      <RecipeList recipes={result.recipes||[]} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx}/>
+      <TipRow tip={result.tip}/>
+      {isLast&&<WeekPlan plan={result.weekPlan}/>}
+      {moreBtn}
+    </div>
+  );
+
+  if(type==="items") return(
+    <div style={{animation:"slideUp .3s ease"}}>
+      {ack && <AckBubble text={ack} label="More for you"/>}
+      <PillarGrid pillars={result.pillars||[]}/>
+      <TipRow tip={result.tip}/>
+      {moreBtn}
+    </div>
+  );
+
+  if(type==="recipe") return(
+    <div style={{animation:"slideUp .3s ease"}}>
+      {ack && <AckBubble text={ack} label="Here is how"/>}
+      <RecipeList recipes={result.recipes||[]} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx}/>
+      <TipRow tip={result.tip}/>
+      {moreBtn}
+    </div>
+  );
+
+  if(type==="insight"||type==="answer") {
+    const label = type==="insight" ? "Here is the deeper picture" : "To answer your question";
+    return(
+      <div style={{animation:"slideUp .3s ease"}}>
+        {ack && <AckBubble text={ack} label={label}/>}
+        {(result.cards||[]).length>0 && (
+          <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:14}}>
+            {result.cards.map((card,i)=>{
+              const meta=PILLAR_META[card.pillar]||PILLAR_META.food;
+              return(
+                <div key={i} style={{display:"flex",gap:14,alignItems:"flex-start",background:meta.bg,border:"1px solid "+meta.border,borderRadius:14,padding:"14px 16px",animation:"fadeUp .25s ease "+(i*.07)+"s both"}}>
+                  <div style={{fontSize:"clamp(24px,2.8vw,30px)",lineHeight:1,flexShrink:0,marginTop:2}}>{card.emoji||"🌿"}</div>
+                  <div>
+                    <div style={{color:meta.color,fontSize:"clamp(.88rem,1.4vw,1rem)",fontWeight:600,marginBottom:4}}>{card.title}</div>
+                    <div style={{color:"#6aaa80",fontSize:"clamp(.82rem,1.3vw,.95rem)",lineHeight:1.65}}>{card.body}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <TipRow tip={result.tip}/>
+        {moreBtn}
+      </div>
+    );
   }
-  return(<div style={{animation:"slideUp .3s ease"}}><AckBubble text={result.acknowledgment} label="Following up"/><PillarGrid pillars={result.pillars}/><RecipeList recipes={result.recipes} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx}/><TipRow tip={result.tip}/>{moreBtn}</div>);
+
+  // Fallback — only render what actually exists
+  return(
+    <div style={{animation:"slideUp .3s ease"}}>
+      {ack && <AckBubble text={ack} label="Here is what I found"/>}
+      {result.pillars?.length>0 && <PillarGrid pillars={result.pillars}/>}
+      {result.recipes?.length>0 && <RecipeList recipes={result.recipes} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx}/>}
+      {result.cards?.length>0 && (
+        <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:14}}>
+          {result.cards.map((card,i)=>{
+            const meta=PILLAR_META[card.pillar]||PILLAR_META.food;
+            return(
+              <div key={i} style={{display:"flex",gap:14,alignItems:"flex-start",background:meta.bg,border:"1px solid "+meta.border,borderRadius:14,padding:"14px 16px"}}>
+                <div style={{fontSize:"clamp(24px,2.8vw,30px)",lineHeight:1,flexShrink:0,marginTop:2}}>{card.emoji||"🌿"}</div>
+                <div>
+                  <div style={{color:meta.color,fontSize:"clamp(.88rem,1.4vw,1rem)",fontWeight:600,marginBottom:4}}>{card.title}</div>
+                  <div style={{color:"#6aaa80",fontSize:"clamp(.82rem,1.3vw,.95rem)",lineHeight:1.65}}>{card.body}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <TipRow tip={result.tip}/>
+      {moreBtn}
+    </div>
+  );
 }
 
 function PricingPage({ onBack }) {
@@ -884,8 +969,8 @@ export default function App() {
           <div>
             <div style={{padding:"16px 20px 0"}}>
               {messages.map((msg,idx)=>(
-                <div key={idx} style={{marginBottom:msg.role==="user"?8:24}}>
-                  {msg.role==="user"&&<div style={{display:"flex",justifyContent:"flex-end"}}><div style={{background:"rgba(34,163,90,.14)",border:"1px solid rgba(34,163,90,.22)",borderRadius:"18px 18px 4px 18px",padding:"10px 16px",maxWidth:"82%",color:"#c8e8ce",fontSize:".88rem",lineHeight:1.6}}>{msg.content}</div></div>}
+                <div key={idx} style={{marginBottom:msg.role==="user"?8:24,minHeight:0}}>
+                  {msg.role==="user"&&<div style={{display:"flex",justifyContent:"flex-end"}}><div style={{display:"inline-block",background:"rgba(34,163,90,.14)",border:"1px solid rgba(34,163,90,.22)",borderRadius:"18px 18px 4px 18px",padding:"10px 16px",maxWidth:"82%",color:"#c8e8ce",fontSize:".88rem",lineHeight:1.6}}>{msg.content}</div></div>}
                   {msg.role==="assistant"&&<ResultCard result={msg.result} isLast={idx===messages.length-1} onGetMore={()=>setPage("pricing")} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={idx}/>}
                 </div>
               ))}
