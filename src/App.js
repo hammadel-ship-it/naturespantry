@@ -23,31 +23,55 @@ const TIERS = [
 
 // ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
 
-const buildPrompt = (user) => {
+const buildPrompt = (user, isFollowUp) => {
   const allergy = user?.allergies?.length
     ? `CRITICAL: User is allergic to ${user.allergies.join(", ")}. NEVER include these or derivatives.`
     : "Note common allergens where relevant.";
   const history = user?.history?.length
     ? `Prior concerns: ${user.history.slice(-4).map(h=>h.query).join("; ")}.`
     : "";
-  return `You are a warm, expert nutritionist drawing from Ayurveda, TCM, Mediterranean, African herbalism, adaptogens, medicinal mushrooms and modern science.
 
+  if (!isFollowUp) {
+    return `You are a warm, expert nutritionist drawing from Ayurveda, TCM, Mediterranean, African herbalism, adaptogens, medicinal mushrooms and modern science.
 ${allergy}
 ${history}
 
-Respond with ONLY a valid JSON object. No markdown. No text outside JSON. No trailing commas. Double quotes only.
+Respond with ONLY a valid JSON object. No markdown. No text outside JSON. No trailing commas. Double quotes only. No newlines inside string values.
 
 Exact shape:
-{"acknowledgment":"string","foods":[{"name":"string","emoji":"string","benefit":"string"}],"recipes":[{"name":"string","emoji":"string","ingredients":["string"],"steps":["string"]}],"tip":"string"}
+{"responseType":"initial","acknowledgment":"string","foods":[{"name":"string","emoji":"string","benefit":"string"}],"recipes":[{"name":"string","emoji":"string","ingredients":["string"],"steps":["string"]}],"tip":"string"}
 
 Rules:
-- acknowledgment: 2-3 warm sentences referencing the user exact words
-- foods: 4-5 items, global superfoods and herbs beyond obvious choices
-- recipes: exactly 2, under 10 mins, whole ingredients only, max 3 steps each
-- tip: one hyper-specific actionable tip
+- responseType: always "initial"
+- acknowledgment: 2-3 warm sentences referencing exact words used
+- foods: 4-6 items, global superfoods and herbs, go beyond obvious
+- recipes: exactly 2, under 10 mins, max 3 steps each
+- tip: one hyper-specific actionable tip for their exact situation
+- ${allergy}`;
+  } else {
+    return `You are a warm, expert nutritionist continuing a wellness conversation. The user is refining or following up on their original concern.
+${allergy}
+
+Respond with ONLY a valid JSON object. No markdown. No text outside JSON. No trailing commas. Double quotes only. No newlines inside string values.
+
+Analyze what the follow-up is asking and respond with the most relevant shape:
+
+If they want MORE foods/alternatives: {"responseType":"foods","acknowledgment":"string","foods":[{"name":"string","emoji":"string","benefit":"string"}],"tip":"string"}
+If they want recipe help: {"responseType":"recipe","acknowledgment":"string","recipes":[{"name":"string","emoji":"string","ingredients":["string"],"steps":["string"]}],"tip":"string"}
+If they want lifestyle/habit advice: {"responseType":"insight","acknowledgment":"string","insight":"string","bullets":["string"],"tip":"string"}
+If they want a comparison or specific question answered: {"responseType":"answer","acknowledgment":"string","answer":"string","tip":"string"}
+If unclear, default to foods shape.
+
+Rules:
+- responseType: one of "foods","recipe","insight","answer"
+- acknowledgment: 1-2 sentences, warm, referencing their exact follow-up words
+- insight: 2-3 paragraphs of expert explanation (for insight type)
+- bullets: 3-5 actionable points (for insight type)
+- answer: direct thorough answer to their specific question (for answer type)
+- tip: always include, hyper-specific to their follow-up
 - ${allergy}
-- No newlines inside string values
-- If follow-up, use conversation context`;
+- Use full conversation context`;
+  }
 };
 
 const buildWeekPlanPrompt = (user, concern) => {
@@ -356,94 +380,179 @@ function WeekPlan({ plan }) {
   );
 }
 
-// ─── RESULT CARD ──────────────────────────────────────────────────────────────
+// ─── SHARED SUB-COMPONENTS ────────────────────────────────────────────────────
+
+function AckBubble({ text, label="A note for you" }) {
+  return (
+    <div style={{background:"linear-gradient(135deg,rgba(34,163,90,.1),rgba(20,80,40,.07))",border:"1px solid rgba(34,163,90,.22)",borderRadius:16,padding:"18px 20px",marginBottom:14,position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:12,right:14,fontSize:20,opacity:.08}}>🌿</div>
+      <div style={{color:"#4a9960",fontSize:".6rem",letterSpacing:".14em",textTransform:"uppercase",marginBottom:6}}>{label}</div>
+      <p style={{color:"#b8e8c4",fontSize:"clamp(.87rem,1.5vw,1.02rem)",lineHeight:1.8,margin:0,fontStyle:"italic"}}>{text}</p>
+    </div>
+  );
+}
+
+function TipRow({ tip }) {
+  if (!tip) return null;
+  return (
+    <div style={{background:"linear-gradient(135deg,rgba(34,163,90,.08),rgba(20,100,55,.04))",border:"1px solid rgba(34,163,90,.18)",borderRadius:12,padding:"12px 16px",display:"flex",gap:10,alignItems:"flex-start",marginBottom:14}}>
+      <span style={{fontSize:15,marginTop:1,flexShrink:0}}>💡</span>
+      <span style={{color:"#a8d8b4",fontSize:"clamp(.82rem,1.4vw,.96rem)",lineHeight:1.62}}>{tip}</span>
+    </div>
+  );
+}
+
+function FoodGrid({ foods }) {
+  if (!foods?.length) return null;
+  return (
+    <div style={{marginBottom:14}}>
+      <div style={{color:"#4a9960",fontSize:".6rem",letterSpacing:".14em",textTransform:"uppercase",marginBottom:10}}>🌱 Foods that help</div>
+      <div className="np-food-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:7}}>
+        {foods.map((f,i)=>(
+          <div key={i} className="food-card" style={{background:"rgba(34,163,90,.07)",border:"1px solid rgba(34,163,90,.16)",borderRadius:14,padding:"clamp(13px,1.5vw,18px) clamp(9px,1.2vw,14px)",textAlign:"center",transition:"transform .18s"}}>
+            <div style={{fontSize:"clamp(22px,2.5vw,28px)",marginBottom:5}}>{f.emoji||"🌿"}</div>
+            <div style={{color:"#b8e8c4",fontSize:"clamp(.76rem,1.2vw,.9rem)",fontWeight:600,marginBottom:3}}>{f.name}</div>
+            <div style={{color:"#4a7a56",fontSize:"clamp(.62rem,1vw,.74rem)",lineHeight:1.4}}>{f.benefit}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RecipeList({ recipes, activeRecipe, setActiveRecipe, msgIdx }) {
+  if (!recipes?.length) return null;
+  return (
+    <div style={{marginBottom:14}}>
+      <div style={{color:"#4a9960",fontSize:".6rem",letterSpacing:".14em",textTransform:"uppercase",marginBottom:10}}>🍳 Quick recipes</div>
+      {recipes.map((r,i)=>{
+        const rid = `${msgIdx}-${i}`;
+        const open = activeRecipe === rid;
+        return (
+          <div key={i} className="rc" style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(34,163,90,.16)",borderRadius:12,overflow:"hidden",marginBottom:7,transition:"border-color .18s"}}>
+            <button onClick={()=>setActiveRecipe(open?null:rid)}
+              style={{width:"100%",textAlign:"left",background:"transparent",border:"none",padding:"12px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{color:"#c8e8ce",fontSize:"clamp(.85rem,1.4vw,1rem)"}}>{r.emoji||"🍽️"} {r.name}</span>
+              <span style={{color:"#3a6644",fontSize:".68rem",transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform .2s",display:"inline-block"}}>▼</span>
+            </button>
+            {open && (
+              <div style={{padding:"0 16px 14px",borderTop:"1px solid rgba(34,163,90,.1)"}}>
+                <div style={{marginTop:10,marginBottom:9}}>
+                  <div style={{color:"#3a6644",fontSize:".58rem",letterSpacing:".1em",textTransform:"uppercase",marginBottom:6}}>Ingredients</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                    {(r.ingredients||[]).map((g,j)=><span key={j} style={{background:"rgba(34,163,90,.09)",border:"1px solid rgba(34,163,90,.18)",borderRadius:20,padding:"3px 9px",color:"#8dc89e",fontSize:".7rem"}}>{g}</span>)}
+                  </div>
+                </div>
+                <div style={{color:"#3a6644",fontSize:".58rem",letterSpacing:".1em",textTransform:"uppercase",marginBottom:6}}>Steps</div>
+                {(r.steps||[]).map((s,j)=>(
+                  <div key={j} style={{display:"flex",gap:8,marginBottom:6,alignItems:"flex-start"}}>
+                    <span style={{minWidth:18,height:18,borderRadius:"50%",background:"rgba(34,163,90,.18)",color:"#4ec97a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".6rem",fontWeight:700,flexShrink:0,marginTop:1}}>{j+1}</span>
+                    <span style={{color:"#8dc89e",fontSize:".79rem",lineHeight:1.5}}>{s}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── RESULT CARD — adapts to responseType ────────────────────────────────────
 
 function ResultCard({ result, isLast, onGetMore, activeRecipe, setActiveRecipe, msgIdx }) {
   if (!result) return null;
-  return (
-    <div style={{animation:"slideUp .3s ease"}}>
-      {/* Acknowledgment */}
-      {result.acknowledgment && (
-        <div style={{background:"linear-gradient(135deg,rgba(34,163,90,.1),rgba(20,80,40,.07))",border:"1px solid rgba(34,163,90,.22)",borderRadius:16,padding:"18px 20px",marginBottom:16,position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",top:12,right:14,fontSize:20,opacity:.1}}>🌿</div>
-          <div style={{color:"#4a9960",fontSize:".62rem",letterSpacing:".14em",textTransform:"uppercase",marginBottom:7}}>A note for you</div>
-          <p className="np-ack-text" style={{color:"#b8e8c4",fontSize:"clamp(.87rem,1.5vw,1.02rem)",lineHeight:1.8,margin:0,fontStyle:"italic"}}>{result.acknowledgment}</p>
-        </div>
-      )}
+  const type = result.responseType || "initial";
 
-      {/* Foods */}
-      {result.foods?.length > 0 && (
-        <div style={{marginBottom:16}}>
-          <div style={{color:"#4a9960",fontSize:".62rem",letterSpacing:".14em",textTransform:"uppercase",marginBottom:10}}>🌱 Foods that help</div>
-          <div className="np-food-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:7}}>
-            {result.foods.map((f,i)=>(
-              <div key={i} className="food-card" style={{background:"rgba(34,163,90,.07)",border:"1px solid rgba(34,163,90,.16)",borderRadius:14,padding:"clamp(13px,1.5vw,20px) clamp(9px,1.2vw,14px)",textAlign:"center",transition:"transform .18s"}}>
-                <div className="np-food-emoji" style={{fontSize:"clamp(22px,2.5vw,30px)",marginBottom:6}}>{f.emoji||"🌿"}</div>
-                <div className="np-food-name" style={{color:"#b8e8c4",fontSize:"clamp(.76rem,1.2vw,.9rem)",fontWeight:600,marginBottom:4}}>{f.name}</div>
-                <div className="np-food-benefit" style={{color:"#4a7a56",fontSize:"clamp(.62rem,1vw,.75rem)",lineHeight:1.4}}>{f.benefit}</div>
+  // ── INITIAL: full rich card ──
+  if (type === "initial") {
+    return (
+      <div style={{animation:"slideUp .3s ease"}}>
+        <AckBubble text={result.acknowledgment} />
+        <FoodGrid foods={result.foods} />
+        <RecipeList recipes={result.recipes} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx} />
+        <TipRow tip={result.tip} />
+        {isLast && <WeekPlan plan={result.weekPlan}/>}
+        {isLast && <div style={{textAlign:"right",marginTop:6}}><button onClick={onGetMore} style={{background:"none",border:"none",color:"#1e3d25",fontSize:".68rem",cursor:"pointer",fontStyle:"italic"}}>Get more searches →</button></div>}
+      </div>
+    );
+  }
+
+  // ── FOODS follow-up: compact grid with fresh ack ──
+  if (type === "foods") {
+    return (
+      <div style={{animation:"slideUp .3s ease"}}>
+        <AckBubble text={result.acknowledgment} label="More for you" />
+        <FoodGrid foods={result.foods} />
+        <TipRow tip={result.tip} />
+        {isLast && <div style={{textAlign:"right",marginTop:6}}><button onClick={onGetMore} style={{background:"none",border:"none",color:"#1e3d25",fontSize:".68rem",cursor:"pointer",fontStyle:"italic"}}>Get more searches →</button></div>}
+      </div>
+    );
+  }
+
+  // ── RECIPE follow-up: just recipes ──
+  if (type === "recipe") {
+    return (
+      <div style={{animation:"slideUp .3s ease"}}>
+        <AckBubble text={result.acknowledgment} label="Here's how to make it" />
+        <RecipeList recipes={result.recipes} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx} />
+        <TipRow tip={result.tip} />
+        {isLast && <div style={{textAlign:"right",marginTop:6}}><button onClick={onGetMore} style={{background:"none",border:"none",color:"#1e3d25",fontSize:".68rem",cursor:"pointer",fontStyle:"italic"}}>Get more searches →</button></div>}
+      </div>
+    );
+  }
+
+  // ── INSIGHT follow-up: prose + bullet points ──
+  if (type === "insight") {
+    return (
+      <div style={{animation:"slideUp .3s ease"}}>
+        <AckBubble text={result.acknowledgment} label="Here's the deeper picture" />
+        {result.insight && (
+          <div style={{background:"rgba(255,255,255,.025)",border:"1px solid rgba(34,163,90,.14)",borderRadius:14,padding:"18px 20px",marginBottom:14}}>
+            <p style={{color:"#9ecfae",fontSize:"clamp(.84rem,1.4vw,.98rem)",lineHeight:1.85,margin:0}}>{result.insight}</p>
+          </div>
+        )}
+        {result.bullets?.length > 0 && (
+          <div style={{marginBottom:14}}>
+            {result.bullets.map((b,i)=>(
+              <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:10,padding:"10px 14px",background:"rgba(34,163,90,.05)",borderRadius:10,border:"1px solid rgba(34,163,90,.12)"}}>
+                <span style={{color:"#22a35a",fontWeight:700,fontSize:".85rem",marginTop:1,flexShrink:0}}>→</span>
+                <span style={{color:"#8dc89e",fontSize:"clamp(.8rem,1.3vw,.93rem)",lineHeight:1.6}}>{b}</span>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+        <TipRow tip={result.tip} />
+        {isLast && <div style={{textAlign:"right",marginTop:6}}><button onClick={onGetMore} style={{background:"none",border:"none",color:"#1e3d25",fontSize:".68rem",cursor:"pointer",fontStyle:"italic"}}>Get more searches →</button></div>}
+      </div>
+    );
+  }
 
-      {/* Recipes */}
-      {result.recipes?.length > 0 && (
-        <div style={{marginBottom:16}}>
-          <div style={{color:"#4a9960",fontSize:".62rem",letterSpacing:".14em",textTransform:"uppercase",marginBottom:10}}>🍳 Quick recipes</div>
-          {result.recipes.map((r,i)=>{
-            const rid = `${msgIdx}-${i}`;
-            const open = activeRecipe === rid;
-            return (
-              <div key={i} className="rc" style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(34,163,90,.16)",borderRadius:12,overflow:"hidden",marginBottom:7,transition:"border-color .18s"}}>
-                <button onClick={()=>setActiveRecipe(open?null:rid)}
-                  style={{width:"100%",textAlign:"left",background:"transparent",border:"none",padding:"12px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span className="np-recipe-name" style={{color:"#c8e8ce",fontSize:"clamp(.85rem,1.4vw,1rem)"}}>{r.emoji||"🍽️"} {r.name}</span>
-                  <span style={{color:"#3a6644",fontSize:".68rem",transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform .2s",display:"inline-block"}}>▼</span>
-                </button>
-                {open && (
-                  <div style={{padding:"0 16px 14px",borderTop:"1px solid rgba(34,163,90,.1)"}}>
-                    <div style={{marginTop:10,marginBottom:9}}>
-                      <div style={{color:"#3a6644",fontSize:".59rem",letterSpacing:".1em",textTransform:"uppercase",marginBottom:6}}>Ingredients</div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                        {(r.ingredients||[]).map((g,j)=><span key={j} style={{background:"rgba(34,163,90,.09)",border:"1px solid rgba(34,163,90,.18)",borderRadius:20,padding:"3px 9px",color:"#8dc89e",fontSize:".7rem"}}>{g}</span>)}
-                      </div>
-                    </div>
-                    <div style={{color:"#3a6644",fontSize:".59rem",letterSpacing:".1em",textTransform:"uppercase",marginBottom:6}}>Steps</div>
-                    {(r.steps||[]).map((s,j)=>(
-                      <div key={j} style={{display:"flex",gap:8,marginBottom:6,alignItems:"flex-start"}}>
-                        <span style={{minWidth:18,height:18,borderRadius:"50%",background:"rgba(34,163,90,.18)",color:"#4ec97a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".6rem",fontWeight:700,flexShrink:0,marginTop:1}}>{j+1}</span>
-                        <span style={{color:"#8dc89e",fontSize:".79rem",lineHeight:1.5}}>{s}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Tip */}
-      {result.tip && (
-        <div style={{background:"linear-gradient(135deg,rgba(34,163,90,.09),rgba(20,100,55,.05))",border:"1px solid rgba(34,163,90,.2)",borderRadius:12,padding:"14px 17px",display:"flex",gap:10,alignItems:"flex-start",marginBottom:16}}>
-          <span style={{fontSize:16,marginTop:1,flexShrink:0}}>💡</span>
-          <div>
-            <div style={{color:"#3a6644",fontSize:".59rem",letterSpacing:".12em",textTransform:"uppercase",marginBottom:4}}>Tip for you</div>
-            <div className="np-tip-text" style={{color:"#a8d8b4",fontSize:"clamp(.83rem,1.4vw,.97rem)",lineHeight:1.65}}>{result.tip}</div>
+  // ── ANSWER follow-up: direct prose answer ──
+  if (type === "answer") {
+    return (
+      <div style={{animation:"slideUp .3s ease"}}>
+        <AckBubble text={result.acknowledgment} label="To answer your question" />
+        {result.answer && (
+          <div style={{background:"rgba(255,255,255,.025)",border:"1px solid rgba(34,163,90,.14)",borderRadius:14,padding:"18px 20px",marginBottom:14}}>
+            <p style={{color:"#9ecfae",fontSize:"clamp(.84rem,1.4vw,.98rem)",lineHeight:1.85,margin:0}}>{result.answer}</p>
           </div>
-        </div>
-      )}
+        )}
+        <TipRow tip={result.tip} />
+        {isLast && <div style={{textAlign:"right",marginTop:6}}><button onClick={onGetMore} style={{background:"none",border:"none",color:"#1e3d25",fontSize:".68rem",cursor:"pointer",fontStyle:"italic"}}>Get more searches →</button></div>}
+      </div>
+    );
+  }
 
-      {/* Week plan — only on last message */}
-      {isLast && <WeekPlan plan={result.weekPlan}/>}
-
-      {/* Get more */}
-      {isLast && (
-        <div style={{textAlign:"right",marginTop:8}}>
-          <button onClick={onGetMore} style={{background:"none",border:"none",color:"#2a4030",fontSize:".68rem",cursor:"pointer",fontStyle:"italic"}}>Get more searches →</button>
-        </div>
-      )}
+  // ── FALLBACK: treat like foods ──
+  return (
+    <div style={{animation:"slideUp .3s ease"}}>
+      <AckBubble text={result.acknowledgment} label="Following up" />
+      <FoodGrid foods={result.foods} />
+      <RecipeList recipes={result.recipes} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx} />
+      <TipRow tip={result.tip} />
+      {isLast && <div style={{textAlign:"right",marginTop:6}}><button onClick={onGetMore} style={{background:"none",border:"none",color:"#1e3d25",fontSize:".68rem",cursor:"pointer",fontStyle:"italic"}}>Get more searches →</button></div>}
     </div>
   );
 }
@@ -660,7 +769,7 @@ export default function App() {
         body: JSON.stringify({
           model:"claude-sonnet-4-20250514",
           max_tokens: 1200,
-          system: buildPrompt(userRef.current),
+          system: buildPrompt(userRef.current, isFollowUp),
           messages: apiMessages,
         }),
       });
@@ -786,24 +895,8 @@ export default function App() {
         {/* ── CHAT VIEW ── */}
         {hasConvo && (
           <div>
-            {/* Search bar at top of chat */}
-            <div className="np-bar-pad" style={{padding:"12px 20px 8px"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
-                <button onClick={reset} style={{background:"none",border:"none",color:"#1e3d25",fontSize:".7rem",cursor:"pointer"}}>← Start over</button>
-                <span style={{color:"#1a3020",fontSize:".66rem"}}>
-                  {messages.filter(m=>m.role==="user").length} search{messages.filter(m=>m.role==="user").length!==1?"es":""} this session
-                  {user && <span className="np-credits-left" style={{marginLeft:7,color:"#1a3020"}}>· {user.credits??0} cr left</span>}
-                </span>
-              </div>
-              <SearchBar value={input} onChange={setInput} onSubmit={handleQuery} loading={loading} hasConvo={true}
-                placeholder="Ask a follow-up question..."/>
-            </div>
-
-            {/* Divider */}
-            <div style={{height:1,background:"rgba(80,180,100,.07)",margin:"4px 20px 16px"}}/>
-
             {/* Messages */}
-            <div className="np-chat-pad" style={{padding:"0 20px"}}>
+            <div className="np-chat-pad" style={{padding:"16px 20px 0"}}>
               {messages.map((msg,idx)=>(
                 <div key={idx} style={{marginBottom:msg.role==="user"?8:24}}>
                   {msg.role==="user" && (
@@ -843,6 +936,18 @@ export default function App() {
               )}
 
               <div ref={bottomRef}/>
+            </div>
+
+            {/* Search bar pinned to bottom of conversation */}
+            <div style={{padding:"10px clamp(16px,3vw,32px) clamp(16px,2vw,24px)",borderTop:"1px solid rgba(80,180,100,.07)",marginTop:4}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <button onClick={reset} style={{background:"none",border:"none",color:"#1e3d25",fontSize:".7rem",cursor:"pointer"}}>← Start over</button>
+                <span style={{color:"#1a3020",fontSize:".66rem"}}>
+                  {messages.filter(m=>m.role==="user").length} search{messages.filter(m=>m.role==="user").length!==1?"es":""} · {user ? `${user.credits??0} cr left` : "guest"}
+                </span>
+              </div>
+              <SearchBar value={input} onChange={setInput} onSubmit={handleQuery} loading={loading} hasConvo={true}
+                placeholder="Ask a follow-up question..."/>
             </div>
           </div>
         )}
