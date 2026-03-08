@@ -323,6 +323,7 @@ function AuthModal({ onClose, onAuth, defaultMode="login" }) {
           email:email.trim(),
           allergies:profile?.allergies||[],
           credits:profile?.credits??3,
+          tier:profile?.tier||"free",
           sex:profile?.sex||"",
           history:profile?.history||[]
         };
@@ -738,7 +739,7 @@ function PricingPage({ onBack, user, onCreditsAdded }) {
       <div style={{position:"relative",zIndex:1,maxWidth:1060,margin:"0 auto",padding:"0 22px 90px"}}>
         <div style={{padding:"24px 0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <button onClick={onBack} style={{background:"none",border:"none",color:"#4a7a56",fontSize:".82rem",cursor:"pointer"}}>← Back</button>
-          <span style={{color:"#4a7a56",fontSize:".82rem",display:"flex",alignItems:"center",gap:6}}><span style={{animation:"float 4s ease-in-out infinite",display:"inline-block"}}>🌿</span> foodnfitness.ai</span>
+
         </div>
         <div style={{textAlign:"center",padding:"52px 0 60px",animation:"fadeUp .6s ease"}}>
           <div style={{display:"inline-block",background:"rgba(34,163,90,.1)",border:"1px solid rgba(34,163,90,.22)",borderRadius:40,padding:"5px 17px",fontSize:".7rem",letterSpacing:".18em",textTransform:"uppercase",color:"#4ec97a",marginBottom:22}}>Simple, honest pricing</div>
@@ -749,6 +750,7 @@ function PricingPage({ onBack, user, onCreditsAdded }) {
           {TIERS.map((t,i)=>(
             <div key={t.name} className="tier-card" style={{position:"relative",background:t.highlight?"linear-gradient(155deg,rgba(34,163,90,.13),rgba(15,55,28,.18))":"rgba(255,255,255,.03)",border:t.highlight?"1px solid rgba(34,163,90,.38)":"1px solid rgba(255,255,255,.07)",borderRadius:22,padding:"34px 28px",display:"flex",flexDirection:"column",animation:"fadeUp .5s ease "+(.1+i*.09)+"s both"}}>
               {t.badge&&<div style={{position:"absolute",top:-13,left:"50%",transform:"translateX(-50%)",background:"linear-gradient(135deg,#22a35a,#1a7a44)",borderRadius:40,padding:"4px 16px",fontSize:".76rem",letterSpacing:".11em",textTransform:"uppercase",color:"#e8f5eb",fontWeight:600,whiteSpace:"nowrap",animation:"pulseRing 2.5s ease infinite"}}>✦ {t.badge}</div>}
+              {user&&user.tier&&user.tier.toLowerCase()===t.name.toLowerCase()&&<div style={{position:"absolute",top:-13,left:"50%",transform:"translateX(-50%)",background:"rgba(34,163,90,.18)",border:"1px solid rgba(34,163,90,.4)",borderRadius:40,padding:"4px 16px",fontSize:".76rem",letterSpacing:".11em",textTransform:"uppercase",color:"#4ec97a",fontWeight:600,whiteSpace:"nowrap"}}>✓ Current plan</div>}
               <div style={{fontSize:".78rem",letterSpacing:".14em",textTransform:"uppercase",color:t.highlight?"#4ec97a":"#2e5535",marginBottom:16}}>{t.name}</div>
               <div style={{marginBottom:4}}><span style={{fontSize:"clamp(2.6rem,5vw,3.2rem)",fontWeight:400,color:"#c8ecd4",letterSpacing:"-.03em",lineHeight:1}}>{t.price}</span><span style={{color:"#2e5535",fontSize:".78rem",marginLeft:5}}>{t.per}</span></div>
               <div style={{color:"#a8ddb5",fontSize:".92rem",marginBottom:4}}>{t.searches}</div>
@@ -933,7 +935,7 @@ export default function App() {
       if(session?.user){
         const profile=await fetchProfile(session.user.id);
         if(profile){
-          const u={id:session.user.id,name:profile.name,email:profile.email,allergies:profile.allergies||[],credits:profile.credits??3,sex:profile.sex||"",history:profile.history||[]};
+          const u={id:session.user.id,name:profile.name,email:profile.email,allergies:profile.allergies||[],credits:profile.credits??3,tier:profile.tier||"free",sex:profile.sex||"",history:profile.history||[]};
           saveUser(u);setUser(u);userRef.current=u;
         }
       }
@@ -942,18 +944,26 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if(params.get("payment")==="success"){
       window.history.replaceState({},"","/");
-      setTimeout(async()=>{
-        // Re-fetch profile to get updated credits from webhook
+      // Poll Supabase until credits are updated (webhook may take a few seconds)
+      let attempts = 0;
+      const pollCredits = async() => {
+        attempts++;
         const {data:{session}}=await supabase.auth.getSession();
         if(session?.user){
           const profile=await fetchProfile(session.user.id);
           if(profile){
-            const u={id:session.user.id,name:profile.name,email:profile.email,allergies:profile.allergies||[],credits:profile.credits??3,sex:profile.sex||"",history:profile.history||[]};
-            saveUser(u);setUser(u);userRef.current=u;
-            alert("✅ Payment successful! Your credits have been added.");
+            const prevCredits = userRef.current?.credits ?? 0;
+            if(profile.credits !== prevCredits || profile.tier !== "free" || attempts >= 8){
+              const u={id:session.user.id,name:profile.name,email:profile.email,allergies:profile.allergies||[],credits:profile.credits??3,tier:profile.tier||"free",sex:profile.sex||"",history:profile.history||[]};
+              saveUser(u);setUser(u);userRef.current=u;
+              alert("✅ Payment successful! Your credits have been updated.");
+              return;
+            }
           }
         }
-      }, 2000);
+        if(attempts < 8) setTimeout(pollCredits, 2000);
+      };
+      setTimeout(pollCredits, 2000);
     }
     // Listen for auth changes (e.g. password reset redirect)
     const {data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
