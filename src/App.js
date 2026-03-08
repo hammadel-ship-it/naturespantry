@@ -1026,7 +1026,7 @@ export default function App() {
     const q=query.trim();if(!q||loading)return;
     const isFollowUp=messages.some(m=>m.role==="assistant");
     if(!user){const c=getGuestCount();if(c>=1){setShowSignUp(true);return;}const n=c+1;localStorage.setItem("np_guest_searches",String(n));setGuestSearches(n);}
-    if(user&&(user.credits??0)<1){setShowNoCredits(true);return;}
+    if(user&&user.tier!=="optimise"&&(user.credits??0)<1){setShowNoCredits(true);return;}
     const apiMessages=[];
     messages.forEach(m=>{if(m.role==="user")apiMessages.push({role:"user",content:m.content});else if(m.result)apiMessages.push({role:"assistant",content:m.result.acknowledgment||""});});
     apiMessages.push({role:"user",content:q});
@@ -1088,7 +1088,7 @@ export default function App() {
             {user
               ?<button onClick={()=>setShowProfile(true)} style={{background:"rgba(34,163,90,.1)",border:"1px solid rgba(34,163,90,.24)",borderRadius:20,padding:"4px 12px",color:"#4ec97a",fontSize:".78rem",cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
                 <span>👤 {user.name.split(" ")[0]}</span>
-                <span style={{background:"rgba(34,163,90,.18)",borderRadius:10,padding:"1px 7px",color:(user.credits??0)<=1?"#f09090":(user.credits??0)<=2?"#ffc85a":"#4ec97a",fontSize:".76rem",fontWeight:600}}>{user.credits??0}cr</span>
+                <span style={{background:"rgba(34,163,90,.18)",borderRadius:10,padding:"1px 7px",color:user.tier==="optimise"?"#4ec97a":(user.credits??0)<=1?"#f09090":(user.credits??0)<=2?"#ffc85a":"#4ec97a",fontSize:".76rem",fontWeight:600}}>{user.tier==="optimise"?"∞":(user.credits??0)+"cr"}</span>
               </button>
               :<button onClick={()=>{setAuthMode("login");setShowAuth(true);}} style={{background:"linear-gradient(135deg,#22a35a,#1a7a44)",border:"none",borderRadius:20,padding:"5px 15px",color:"#e8f5eb",fontSize:".78rem",cursor:"pointer",fontWeight:600}}>Sign in</button>
             }
@@ -1111,7 +1111,7 @@ export default function App() {
               </div>
             </div>
             <div style={{padding:"0 clamp(20px,5vw,80px) 20px"}}>
-              <SearchBar value={input} onChange={setInput} onSubmit={handleQuery} loading={loading} hasConvo={false} placeholder="e.g. I feel exhausted, anxious and cannot sleep..."/>
+              <SearchBar value={input} onChange={setInput} onSubmit={handleQuery} loading={loading} hasConvo={false} placeholder="How are you feeling? What do you want to improve?"/>
             </div>
             <div style={{margin:"0 clamp(20px,5vw,80px) 20px",background:"rgba(255,200,70,.04)",border:"1px solid rgba(255,200,70,.12)",borderRadius:12,padding:"10px 14px",display:"flex",gap:9,alignItems:"flex-start"}}>
               <span style={{fontSize:13,flexShrink:0,marginTop:1,opacity:.7}}>⚠️</span>
