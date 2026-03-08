@@ -692,25 +692,35 @@ function PricingPage({ onBack, user, onCreditsAdded }) {
     if (!window.Paddle) { alert("Payment system loading, please try again in a moment."); return; }
     if (!user) { alert("Please sign in first to purchase a plan."); return; }
     setProcessing(t.paddleId);
-    window.Paddle.Checkout.open({
-      items: [{ priceId: t.paddleId, quantity: 1 }],
-      customer: user ? { email: user.email } : undefined,
-      customData: { userId: user?.email || "guest", tier: t.name },
-      settings: {
-        displayMode: "overlay",
-        theme: "dark",
-        locale: "en",
-      },
-      successCallback: (data) => {
-        setProcessing(null);
-        const credits = CREDITS_MAP[t.paddleId] || 10;
-        if (onCreditsAdded) onCreditsAdded(credits, t.name);
-        alert("✅ Payment successful! " + credits + " credits added to your account.");
-        onBack();
-      },
-      closeCallback: () => setProcessing(null),
-      errorCallback: (err) => { setProcessing(null); console.error("Paddle error:", err); },
-    });
+    try {
+      window.Paddle.Checkout.open({
+        items: [{ priceId: t.paddleId, quantity: 1 }],
+        customer: { email: user.email },
+        settings: {
+          displayMode: "overlay",
+          theme: "dark",
+          locale: "en",
+          successUrl: "https://foodnfitness.ai?payment=success",
+        },
+        successCallback: (data) => {
+          setProcessing(null);
+          const credits = CREDITS_MAP[t.paddleId] || 10;
+          if (onCreditsAdded) onCreditsAdded(credits, t.name);
+          alert("✅ Payment successful! " + credits + " credits added to your account.");
+          onBack();
+        },
+        closeCallback: () => setProcessing(null),
+        errorCallback: (err) => {
+          setProcessing(null);
+          console.error("Paddle error:", err);
+          alert("Payment error: " + (err?.message || JSON.stringify(err)));
+        },
+      });
+    } catch(e) {
+      setProcessing(null);
+      console.error("Paddle exception:", e);
+      alert("Checkout error: " + e.message);
+    }
   };
   return(
     <div style={{minHeight:"100vh",background:"#0b1a0d",color:"#e0ede2",fontFamily:"'Georgia',serif"}}>
