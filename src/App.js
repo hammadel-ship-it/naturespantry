@@ -358,6 +358,21 @@ function AuthModal({ onClose, onAuth, defaultMode="login" }) {
   const pw={position:"relative",display:"flex",alignItems:"center"};
   const eb={position:"absolute",right:12,background:"none",border:"none",color:"#3a6644",cursor:"pointer",padding:2,display:"flex",alignItems:"center"};
 
+  if(mode==="reset")return(
+    <Modal onClose={onClose}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <span style={{color:"#a8ddb5",fontSize:"1.05rem"}}>🔑 Set new password</span>
+        <button onClick={onClose} style={{background:"none",border:"none",color:"#3a6644",cursor:"pointer",fontSize:"1.1rem"}}>✕</button>
+      </div>
+      {err&&<div style={{color:"#f09090",fontSize:".82rem",marginBottom:12,padding:"9px 13px",background:"rgba(200,60,60,.1)",borderRadius:9,border:"1px solid rgba(200,60,60,.2)"}}>{err}</div>}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{color:"#4a7a56",fontSize:".82rem"}}>Enter your new password below.</div>
+        <div style={pw}><input value={pass} onChange={e=>setPass(e.target.value)} placeholder="New password (min 6 characters)" type={showPass?"text":"password"} onKeyDown={e=>e.key==="Enter"&&updatePassword()} style={{...inp,paddingRight:40}}/><button onClick={()=>setShowPass(p=>!p)} style={eb}><EyeIcon open={showPass}/></button></div>
+        <button onClick={updatePassword} disabled={loading} className="cta-btn" style={{background:"linear-gradient(135deg,#22a35a,#1a7a44)",border:"none",borderRadius:11,padding:"13px",color:"#e8f5eb",fontSize:".9rem",cursor:"pointer",fontWeight:600}}>{loading?"Updating…":"Set new password →"}</button>
+      </div>
+    </Modal>
+  );
+
   if(mode==="forgot")return(
     <Modal onClose={onClose}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
@@ -441,7 +456,7 @@ function ProfileModal({ user, onClose, onUpdate, onLogout, onUpgrade }) {
   return(
     <Modal onClose={onClose}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{color:"#a8ddb5",fontSize:"1.05rem"}}>👤 {user.name}</span><button onClick={onClose} style={{background:"none",border:"none",color:"#3a6644",cursor:"pointer",fontSize:"1.1rem"}}>✕</button></div>
-      <div style={{color:"#2e5535",fontSize:".85rem",marginBottom:20}}>{user.email} · {user.history?.length||0} searches · <span style={{color:(user.credits??0)<=1?"#f09090":(user.credits??0)<=2?"#ffc85a":"#5ed880"}}>{user.credits??0} credits</span></div>
+      <div style={{color:"#2e5535",fontSize:".85rem",marginBottom:20}}>{user.email} · {user.history?.length||0} searches · <span style={{color:(user.tier==="optimise")?"#5ed880":(user.credits??0)<=1?"#f09090":(user.credits??0)<=2?"#ffc85a":"#5ed880"}}>{user.tier==="optimise"?"∞ Unlimited credits":(user.credits??0)+" credits"}</span>{user.tier&&user.tier!=="free"&&<span style={{marginLeft:6,color:"#4ec97a",fontSize:".78rem",textTransform:"capitalize"}}>· {user.tier} plan</span>}</div>
       <div style={{marginBottom:20}}>
         <div style={{color:"#4a7a56",fontSize:".78rem",letterSpacing:".1em",textTransform:"uppercase",marginBottom:10}}>Biological sex <span style={{color:"#2a4a30",fontStyle:"italic",letterSpacing:0,textTransform:"none",fontSize:".74rem"}}>(personalises results)</span></div>
         <div style={{display:"flex",gap:8}}>{SEX.map(opt=>{const active=sex===opt.value;return<button key={opt.value} onClick={()=>setSex(active?"":opt.value)} style={{flex:1,background:active?"rgba(34,163,90,.18)":"rgba(255,255,255,.04)",border:"1.5px solid "+(active?"rgba(34,163,90,.55)":"rgba(255,255,255,.1)"),borderRadius:14,padding:"12px 8px",cursor:"pointer",transition:"all .16s",display:"flex",flexDirection:"column",alignItems:"center",gap:5}}><span style={{fontSize:20}}>{opt.icon}</span><span style={{color:active?"#5ed880":"#4a7a56",fontSize:".84rem",fontFamily:"'Georgia',serif"}}>{opt.label}</span></button>;})}</div>
@@ -1052,7 +1067,7 @@ export default function App() {
   return(
     <div style={{minHeight:"100vh",background:"#0b1a0d",color:"#e0ede2"}}>
       <style>{CSS}</style>
-      {showAuth&&<AuthModal onClose={()=>setShowAuth(false)} onAuth={handleAuth} defaultMode={authMode}/>}
+      {showAuth&&<AuthModal key={authMode} onClose={()=>setShowAuth(false)} onAuth={handleAuth} defaultMode={authMode}/>}
       {showProfile&&user&&<ProfileModal user={user} onClose={()=>setShowProfile(false)} onUpdate={u=>{setUser(u);setShowProfile(false);}} onLogout={handleLogout} onUpgrade={()=>{setShowProfile(false);setPage("pricing");}}/>}
       {showNoCredits&&<NoCreditsModal onClose={()=>setShowNoCredits(false)} onViewPlans={()=>{setShowNoCredits(false);setPage("pricing");}}/>}
       {showSignUp&&<SignUpPrompt onClose={()=>setShowSignUp(false)} onSignUp={()=>{setShowSignUp(false);setAuthMode("signup");setShowAuth(true);}}/>}
@@ -1132,14 +1147,14 @@ export default function App() {
               <div ref={bottomRef}/>
             </div>
             <div style={{padding:"10px clamp(16px,3vw,32px) clamp(16px,2vw,24px)",borderTop:"1px solid rgba(80,180,100,.07)",marginTop:4}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                <button onClick={reset} style={{background:"none",border:"none",color:"#3a6644",fontSize:".82rem",cursor:"pointer"}}>← Start over</button>
-                <span style={{color:"#1a3020",fontSize:".78rem"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+                <button onClick={reset} style={{background:"none",border:"none",color:"#3a6644",fontSize:".82rem",cursor:"pointer",flexShrink:0}}>← Start over</button>
+                <span style={{color:"#1a3020",fontSize:".75rem",textAlign:"right",minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                   {(()=>{
-                    if(user)return messages.filter(m=>m.role==="user").length+" search"+(messages.filter(m=>m.role==="user").length!==1?"es":"")+" · "+(user.credits??0)+" cr left";
+                    if(user){const searches=messages.filter(m=>m.role==="user").length;const credDisplay=user.tier==="optimise"?"∞ unlimited":(user.credits??0)+" cr left";return searches+" search"+(searches!==1?"es":"")+" · "+credDisplay;}
                     const g=getGuestCount();
-                    if(g>=1)return <span style={{color:"#f09090",fontWeight:500}}>No free searches left — <button onClick={()=>{setAuthMode("signup");setShowAuth(true);}} style={{background:"none",border:"none",color:"#4ec97a",cursor:"pointer",fontFamily:"'Georgia',serif",fontSize:"inherit",padding:0,textDecoration:"underline"}}>sign up free</button></span>;
-                    return "1 free search — sign up for 3 credits";
+                    if(g>=1)return <span style={{color:"#f09090",fontWeight:500,fontSize:".75rem"}}>No searches left — <button onClick={()=>{setAuthMode("signup");setShowAuth(true);}} style={{background:"none",border:"none",color:"#4ec97a",cursor:"pointer",fontFamily:"'Georgia',serif",fontSize:"inherit",padding:0,textDecoration:"underline"}}>sign up</button></span>;
+                    return "1 free search · sign up for 3 credits";
                   })()}
                 </span>
               </div>
