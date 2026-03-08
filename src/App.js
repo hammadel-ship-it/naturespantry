@@ -899,9 +899,8 @@ export default function App() {
           </div>
         </nav>
 
-        {/* HOME */}
-        {!hasConvo&&(
-          <div style={{animation:"fadeUp .45s ease"}}>
+        {/* HOME - always mounted, just hidden when convo starts */}
+        <div style={{display: hasConvo ? "none" : "block"}}>
             <div style={{textAlign:"center",padding:"clamp(36px,6vw,72px) clamp(24px,8vw,120px) clamp(20px,3vw,36px)"}}>
               <div style={{display:"flex",justifyContent:"center",marginBottom:18}}>
                 <FnfLogo size={80} animated={true}/>
@@ -931,11 +930,10 @@ export default function App() {
               <ChipSection onQuery={handleQuery}/>
             </div>
             {!user&&<div style={{textAlign:"center",padding:"4px 0 8px"}}><button onClick={()=>{setAuthMode("signup");setShowAuth(true);}} style={{background:"none",border:"none",color:"#1e3d25",fontSize:".76rem",cursor:"pointer",fontStyle:"italic"}}>{(()=>{const g=getGuestCount();return g===0?"✦ 1 free search — no account needed":"Sign up free for 3 credits →";})()}</button></div>}
-          </div>
-        )}
+        </div>
 
-        {/* CHAT */}
-        {hasConvo&&(
+        {/* CHAT - always mounted, shown when convo starts */}
+        <div style={{display: hasConvo ? "block" : "none"}}>
           <div style={{minHeight:"80vh",display:"flex",flexDirection:"column"}}>
             <div style={{padding:"16px 20px 0"}}>
               {messages.map((msg,idx)=>(
@@ -963,9 +961,9 @@ export default function App() {
               <SearchBar value={input} onChange={setInput} onSubmit={handleQuery} loading={loading} hasConvo={true} placeholder="Ask a follow-up — food, exercise, breathwork, sleep..."/>
             </div>
           </div>
-        )}
+        </div>
 
-        {!hasConvo&&<div style={{textAlign:"center",padding:"24px 0 8px",color:"#3a6644",fontSize:".82rem",letterSpacing:".06em"}}>foodnfitness.ai · Eat well. Move well. Live well. · Not medical advice</div>}
+        <div style={{display: hasConvo ? "none" : "block", textAlign:"center",padding:"24px 0 8px",color:"#3a6644",fontSize:".82rem",letterSpacing:".06em"}}>foodnfitness.ai · Eat well. Move well. Live well. · Not medical advice</div>
       </div>
     </div>
   );
