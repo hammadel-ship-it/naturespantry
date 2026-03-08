@@ -690,6 +690,7 @@ function PricingPage({ onBack, user, onCreditsAdded }) {
 
   const openCheckout = (t) => {
     if (!window.Paddle) { alert("Payment system loading, please try again in a moment."); return; }
+    if (!user) { alert("Please sign in first to purchase a plan."); return; }
     setProcessing(t.paddleId);
     window.Paddle.Checkout.open({
       items: [{ priceId: t.paddleId, quantity: 1 }],
