@@ -1105,7 +1105,7 @@ export default function App() {
           </div>
         </div>
 
-        <div style={{display: hasConvo ? "none" : "block", textAlign:"center",padding:"24px 0 8px",color:"#3a6644",fontSize:".82rem",letterSpacing:".06em"}}>foodnfitness.ai · Eat well. Move well. Live well. · Not medical advice</div>
+        <div style={{display: hasConvo ? "none" : "block", textAlign:"center",padding:"24px 0 8px"}}><div style={{color:"#3a6644",fontSize:".82rem",letterSpacing:".06em",marginBottom:8}}>foodnfitness.ai · Eat well. Move well. Live well. · Not medical advice</div><div style={{display:"flex",justifyContent:"center",gap:20}}><a href="/terms.html" style={{color:"#2a5435",fontSize:".75rem",textDecoration:"none"}}>Terms</a><a href="/privacy.html" style={{color:"#2a5435",fontSize:".75rem",textDecoration:"none"}}>Privacy</a><a href="/refund.html" style={{color:"#2a5435",fontSize:".75rem",textDecoration:"none"}}>Refund Policy</a></div></div>
       </div>
     </div>
   );
