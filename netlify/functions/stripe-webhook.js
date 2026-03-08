@@ -31,7 +31,6 @@ async function creditUser(email, priceId) {
 
   if (!profile) { console.error('No profile for:', email); return; }
 
-  // For renewals: reset to plan credits. For upgrades: set new tier credits.
   const newCredits = tier === 'optimise' ? 9999 : credits;
   await supabase
     .from('profiles')
@@ -39,6 +38,11 @@ async function creditUser(email, priceId) {
     .eq('id', profile.id);
 
   console.log(`Credited ${newCredits} to ${email}, tier: ${tier}`);
+}
+
+async function getEmailFromCustomer(customerId) {
+  const customer = await stripe.customers.retrieve(customerId);
+  return customer.email;
 }
 
 exports.handler = async (event) => {
@@ -60,20 +64,17 @@ exports.handler = async (event) => {
   if (stripeEvent.type === 'checkout.session.completed') {
     const session = stripeEvent.data.object;
     const email = session.customer_email || session.metadata?.email;
-
     let priceId;
     try {
       const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
       priceId = lineItems.data[0]?.price?.id;
     } catch(e) { console.error('Line items error:', e); }
-
     if (email && priceId) await creditUser(email, priceId);
   }
 
   // ── Monthly renewal ───────────────────────────────────────────
   if (stripeEvent.type === 'invoice.payment_succeeded') {
     const invoice = stripeEvent.data.object;
-    // Only process subscription renewals, not the first invoice (handled above)
     if (invoice.billing_reason === 'subscription_cycle') {
       const email = invoice.customer_email;
       const priceId = invoice.lines?.data[0]?.price?.id;
@@ -81,11 +82,20 @@ exports.handler = async (event) => {
     }
   }
 
+  // ── Upgrade / downgrade via portal ────────────────────────────
+  if (stripeEvent.type === 'customer.subscription.updated') {
+    const subscription = stripeEvent.data.object;
+    const priceId = subscription.items?.data[0]?.price?.id;
+    const email = await getEmailFromCustomer(subscription.customer);
+    if (email && priceId && TIER_MAP[priceId]) {
+      await creditUser(email, priceId);
+    }
+  }
+
   // ── Subscription cancelled ────────────────────────────────────
   if (stripeEvent.type === 'customer.subscription.deleted') {
     const subscription = stripeEvent.data.object;
-    const customer = await stripe.customers.retrieve(subscription.customer);
-    const email = customer.email;
+    const email = await getEmailFromCustomer(subscription.customer);
     if (email) {
       const { data: profile } = await supabase
         .from('profiles')
@@ -97,7 +107,7 @@ exports.handler = async (event) => {
           .from('profiles')
           .update({ tier: 'free' })
           .eq('id', profile.id);
-        console.log(`Subscription cancelled for ${email}, tier set to free`);
+        console.log(`Subscription cancelled for ${email}`);
       }
     }
   }
