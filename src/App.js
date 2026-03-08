@@ -950,7 +950,7 @@ export default function App() {
                   {(()=>{
                     if(user)return messages.filter(m=>m.role==="user").length+" search"+(messages.filter(m=>m.role==="user").length!==1?"es":"")+" · "+(user.credits??0)+" cr left";
                     const g=getGuestCount();
-                    if(g>=1)return <span style={{color:"#f09090",fontWeight:500}}>No free searches left — <button onClick={()=>setShowSignUp(true)} style={{background:"none",border:"none",color:"#4ec97a",cursor:"pointer",fontFamily:"'Georgia',serif",fontSize:"inherit",padding:0,textDecoration:"underline"}}>sign up free</button></span>;
+                    if(g>=1)return <span style={{color:"#f09090",fontWeight:500}}>No free searches left — <button onClick={()=>{setAuthMode("signup");setShowAuth(true);}} style={{background:"none",border:"none",color:"#4ec97a",cursor:"pointer",fontFamily:"'Georgia',serif",fontSize:"inherit",padding:0,textDecoration:"underline"}}>sign up free</button></span>;
                     return "1 free search — sign up for 3 credits";
                   })()}
                 </span>
