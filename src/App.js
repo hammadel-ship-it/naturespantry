@@ -872,6 +872,7 @@ export default function App() {
       {showAuth&&<AuthModal onClose={()=>setShowAuth(false)} onAuth={handleAuth} defaultMode={authMode}/>}
       {showProfile&&user&&<ProfileModal user={user} onClose={()=>setShowProfile(false)} onUpdate={u=>{setUser(u);setShowProfile(false);}} onLogout={handleLogout}/>}
       {showNoCredits&&<NoCreditsModal onClose={()=>setShowNoCredits(false)} onViewPlans={()=>{setShowNoCredits(false);setPage("pricing");}}/>}
+      {showSignUp&&<SignUpPrompt onClose={()=>setShowSignUp(false)} onSignUp={()=>{setShowSignUp(false);setAuthMode("signup");setShowAuth(true);}}/>}
       {showHistory && <HistoryModal onClose={()=>setShowHistory(false)} onLoad={(msgs)=>{setMessages(msgs);setInput("");setError(null);}}/>}
       <div style={{position:"fixed",inset:0,background:"#0b1a0d",zIndex:0,pointerEvents:"none"}}/>
       <div style={{position:"relative",zIndex:1,maxWidth:1100,margin:"0 auto",padding:"0 0 80px",overflowX:"hidden",minHeight:"100vh"}}>
@@ -926,7 +927,11 @@ export default function App() {
               </div>
               <ChipSection onQuery={handleQuery}/>
             </div>
-            {!user&&<div style={{textAlign:"center",padding:"4px 0 8px"}}><button onClick={()=>{setAuthMode("signup");setShowAuth(true);}} style={{background:"none",border:"none",color:"#1e3d25",fontSize:".76rem",cursor:"pointer",fontStyle:"italic"}}>{(()=>{const g=getGuestCount();return g===0?"✦ 1 free search — no account needed":"Sign up free for 3 credits →";})()}</button></div>}
+            {!user&&<div style={{textAlign:"center",padding:"12px 0 8px"}}>
+              <button onClick={()=>{setAuthMode("signup");setShowAuth(true);}} style={{background:"linear-gradient(135deg,rgba(34,163,90,.18),rgba(34,163,90,.08))",border:"1px solid rgba(34,163,90,.4)",borderRadius:24,padding:"10px 28px",color:"#4ec97a",fontSize:".95rem",cursor:"pointer",fontFamily:"'Georgia',serif",fontWeight:600,letterSpacing:".02em",boxShadow:"0 2px 16px rgba(34,163,90,.15)",transition:"all .18s"}}>
+                ✦ Sign up free — get 3 credits
+              </button>
+            </div>}
         </div>
 
         {/* CHAT - always mounted, shown when convo starts */}
