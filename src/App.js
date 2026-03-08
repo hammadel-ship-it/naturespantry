@@ -62,7 +62,7 @@ const buildPrompt = (user, isFollowUp) => {
       "OUTPUT RULES - FOLLOW EXACTLY:\n" +
       "1. Output ONLY a JSON object. Zero text before or after it.\n" +
       "2. No markdown. No backticks. No code fences.\n" +
-      "3. Use double quotes for all strings. No single quotes. No apostrophes in values.\n" +
+      "3. Use double quotes for all strings. No single quotes. No apostrophes or contractions - write do not instead of dont, you will instead of youll.\n" +
       "4. No newlines inside string values. Keep all strings on one line.\n" +
       "5. No trailing commas.\n\n" +
       "JSON format (copy this structure exactly):\n" +
@@ -79,7 +79,7 @@ const buildPrompt = (user, isFollowUp) => {
       "OUTPUT RULES - FOLLOW EXACTLY:\n" +
       "1. Output ONLY a JSON object. Zero text before or after it.\n" +
       "2. No markdown. No backticks. No code fences.\n" +
-      "3. Use double quotes. No single quotes. No apostrophes in string values.\n" +
+      "3. Use double quotes. No single quotes. No apostrophes or contractions - write do not instead of dont, you will instead of youll.\n" +
       "4. No newlines inside string values.\n" +
       "5. No trailing commas.\n\n" +
       "Pick ONE of these response types based on what the user asked:\n\n" +
@@ -214,6 +214,9 @@ function safeParseJSON(raw, expectArray=false) {
   // 1. Strip markdown fences
   let s = raw.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/i,"").trim();
 
+  // 1b. Replace smart/curly quotes with straight quotes
+  s = s.replace(/[\u2018\u2019]/g,"'").replace(/[\u201C\u201D]/g,'"');
+
   // 2. Extract outermost { } or [ ]
   if (expectArray) { const a=s.indexOf("["),b=s.lastIndexOf("]"); if(a!==-1&&b!==-1)s=s.slice(a,b+1); }
   else             { const a=s.indexOf("{"),b=s.lastIndexOf("}"); if(a!==-1&&b!==-1)s=s.slice(a,b+1); }
@@ -252,7 +255,7 @@ function safeParseJSON(raw, expectArray=false) {
     try{return JSON.parse(trimmed.replace(/,\s*([}\]])/g,"$1"));}catch(_){}
   }
 
-  throw new Error("Could not parse AI response as JSON.");
+  throw new Error("Something went wrong — please try again.");
 }
 
 function Modal({ onClose, children, maxWidth=420 }) {
@@ -1031,7 +1034,7 @@ export default function App() {
     messages.forEach(m=>{if(m.role==="user")apiMessages.push({role:"user",content:m.content});else if(m.result)apiMessages.push({role:"assistant",content:m.result.acknowledgment||""});});
     apiMessages.push({role:"user",content:q});
     setMessages(p=>[...p,{role:"user",content:q}]);setInput("");setError(null);setLoading(true);
-    try{
+    const attemptQuery = async (attempt=1) => {
       const res=await fetch("/.netlify/functions/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,system:buildPrompt(userRef.current,isFollowUp),messages:apiMessages})});
       const text=await res.text();
       if(!res.ok)throw new Error("Server error "+res.status+": "+text.slice(0,180));
@@ -1039,7 +1042,14 @@ export default function App() {
       const raw=(data.content||[]).map(b=>b.text||"").join("").trim();
       if(!raw)throw new Error("Empty response from AI.");
       const result=safeParseJSON(raw,false);
-      if(!result.acknowledgment)throw new Error("Unexpected response shape.");
+      if(!result.acknowledgment){
+        if(attempt<3)return attemptQuery(attempt+1);
+        throw new Error("Unexpected response shape.");
+      }
+      return result;
+    };
+    try{
+      const result = await attemptQuery();
       setMessages(p=>{
         const updated=[...p,{role:"assistant",content:result.acknowledgment,result}];
         if (user) saveConversation(updated);
@@ -1048,7 +1058,7 @@ export default function App() {
       recordSuccess(isFollowUp,q);
       if(window.posthog)window.posthog.capture("search_completed",{query:q,is_follow_up:isFollowUp,pillar_count:(result.pillars||[]).length});
       fetchWeekPlan(q);
-    }catch(e){setError(e.message);}finally{setLoading(false);}
+    }catch(e){setError("Something went wrong — please try your search again.");}finally{setLoading(false);}
   };
 
   const reset=()=>{setMessages([]);setError(null);setInput("");};
