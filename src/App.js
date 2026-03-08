@@ -37,9 +37,9 @@ const PILLAR_META = {
 const ALLERGIES = ["Gluten","Dairy","Nuts","Soy","Eggs","Shellfish","Fish","Sesame"];
 
 const TIERS = [
-  { name:"Starter",  price:"$3",  per:"one-time",  searches:"10 searches", rate:"$0.30 / search", desc:"Try it out. No commitment.", cta:"Get Started", highlight:false, paddleId:"pri_01kk5jxb04fcqhwgbj1t67wex2", features:["10 AI wellness searches","Food, fitness & breathwork","Personalised to your body","Never expires"] },
-  { name:"Thrive",   price:"$9",  per:"per month", searches:"40 searches", rate:"$0.23 / search", desc:"For those committed to feeling their best.", cta:"Start Thriving", highlight:true, paddleId:"pri_01kk5jzhbwje0qmgjwk76xkq9w", badge:"Most Popular", features:["40 searches / month","All 4 wellness pillars","Personalised responses","Best value monthly"] },
-  { name:"Optimise", price:"$19", per:"per month", searches:"Unlimited",   rate:"No limits ever", desc:"For those who make wellness a daily practice.", cta:"Start Optimising", highlight:false, paddleId:"pri_01kk5k0qn95abpkvd2nvww5he2", features:["Unlimited searches","All 4 wellness pillars","Full personalisation","Best value for daily use"] },
+  { name:"Starter",  price:"£3",  per:"one-time",  searches:"10 searches", rate:"£0.30 / search", desc:"Try it out. No commitment.", cta:"Get Started", highlight:false, stripeId:"price_1T8hNmCJF4DF72elItDLqZIp", features:["10 AI wellness searches","Food, fitness & breathwork","Personalised to your body","Never expires"] },
+  { name:"Thrive",   price:"£9",  per:"per month", searches:"40 searches", rate:"£0.23 / search", desc:"For those committed to feeling their best.", cta:"Start Thriving", highlight:true, stripeId:"price_1T8hOyCJF4DF72elWJQpeY94", badge:"Most Popular", features:["40 searches / month","All 4 wellness pillars","Personalised responses","Best value monthly"] },
+  { name:"Optimise", price:"£19", per:"per month", searches:"Unlimited",   rate:"No limits ever", desc:"For those who make wellness a daily practice.", cta:"Start Optimising", highlight:false, stripeId:"price_1T8hPUCJF4DF72el0FctAFJv", features:["Unlimited searches","All 4 wellness pillars","Full personalisation","Best value for daily use"] },
 ];
 
 // ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
@@ -683,45 +683,33 @@ function PricingPage({ onBack, user, onCreditsAdded }) {
   const [processing, setProcessing] = useState(null);
 
   const CREDITS_MAP = {
-    "pri_01kk5jxb04fcqhwgbj1t67wex2": 10,   // Starter
-    "pri_01kk5jzhbwje0qmgjwk76xkq9w": 40,   // Thrive
-    "pri_01kk5k0qn95abpkvd2nvww5he2": 9999, // Optimise
+    "price_1T8hNmCJF4DF72elItDLqZIp": 10,
+    "price_1T8hOyCJF4DF72elWJQpeY94": 40,
+    "price_1T8hPUCJF4DF72el0FctAFJv": 9999,
   };
 
-  const openCheckout = (t) => {
-    if (!window.Paddle) { alert("Payment system loading, please try again in a moment."); return; }
-    if (!user) { alert("Please sign in first to purchase a plan."); return; }
-    setProcessing(t.paddleId);
+  const openCheckout = async (t) => {
+    if (!window.Stripe) { alert("Payment system loading, please try again in a moment."); return; }
+    if (!user) { alert("Please sign in first to purchase a plan."); setShowAuth(true); return; }
+    setProcessing(t.stripeId);
     try {
-      window.Paddle.Checkout.open({
-        items: [{ priceId: t.paddleId, quantity: 1 }],
-        customer: { email: user.email },
-        settings: {
-          displayMode: "overlay",
-          theme: "dark",
-          locale: "en",
-          successUrl: "https://foodnfitness.ai?payment=success",
-        },
-        successCallback: (data) => {
-          setProcessing(null);
-          const credits = CREDITS_MAP[t.paddleId] || 10;
-          if (onCreditsAdded) onCreditsAdded(credits, t.name);
-          alert("✅ Payment successful! " + credits + " credits added to your account.");
-          onBack();
-        },
-        closeCallback: () => setProcessing(null),
-        errorCallback: (err) => {
-          setProcessing(null);
-          console.error("Paddle error:", err);
-          alert("Payment error: " + (err?.message || JSON.stringify(err)));
-        },
+      const resp = await fetch("/.netlify/functions/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceId: t.stripeId, email: user.email, tier: t.name }),
       });
+      const data = await resp.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Checkout error: " + (data.error || "Unknown error"));
+        setProcessing(null);
+      }
     } catch(e) {
       setProcessing(null);
-      console.error("Paddle exception:", e);
       alert("Checkout error: " + e.message);
     }
-  };
+  };;
   return(
     <div style={{minHeight:"100vh",background:"#0b1a0d",color:"#e0ede2",fontFamily:"'Georgia',serif"}}>
       <div style={{position:"relative",zIndex:1,maxWidth:1060,margin:"0 auto",padding:"0 22px 90px"}}>
@@ -744,12 +732,12 @@ function PricingPage({ onBack, user, onCreditsAdded }) {
               <div style={{display:"inline-block",background:"rgba(34,163,90,.07)",border:"1px solid rgba(34,163,90,.14)",borderRadius:20,padding:"3px 12px",fontSize:".8rem",color:"#3a6644",marginBottom:20,alignSelf:"flex-start"}}>{t.rate}</div>
               <p style={{color:"#2e5535",fontSize:".9rem",lineHeight:1.7,marginBottom:22,fontStyle:"italic"}}>{t.desc}</p>
               <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:28,flex:1}}>{t.features.map((f,j)=><div key={j} style={{display:"flex",gap:8,alignItems:"flex-start"}}><span style={{color:"#22a35a",fontSize:".82rem",marginTop:1,flexShrink:0}}>✓</span><span style={{color:"#5a8a6a",fontSize:".9rem",lineHeight:1.55}}>{f}</span></div>)}</div>
-              <button className="cta-btn" onClick={()=>openCheckout(t)} disabled={processing===t.paddleId} style={{background:t.highlight?"linear-gradient(135deg,#22a35a,#1a7a44)":"rgba(255,255,255,.05)",border:t.highlight?"none":"1px solid rgba(80,180,100,.22)",borderRadius:12,padding:"13px 20px",color:t.highlight?"#e8f5eb":"#6aaa80",fontSize:".86rem",cursor:processing===t.paddleId?"wait":"pointer",fontWeight:t.highlight?600:400,width:"100%",boxShadow:t.highlight?"0 4px 20px rgba(34,163,90,.22)":"none",opacity:processing&&processing!==t.paddleId?.6:1}}>{processing===t.paddleId?"Processing…":t.cta+" →"}</button>
+              <button className="cta-btn" onClick={()=>openCheckout(t)} disabled={processing===t.stripeId} style={{background:t.highlight?"linear-gradient(135deg,#22a35a,#1a7a44)":"rgba(255,255,255,.05)",border:t.highlight?"none":"1px solid rgba(80,180,100,.22)",borderRadius:12,padding:"13px 20px",color:t.highlight?"#e8f5eb":"#6aaa80",fontSize:".86rem",cursor:processing===t.stripeId?"wait":"pointer",fontWeight:t.highlight?600:400,width:"100%",boxShadow:t.highlight?"0 4px 20px rgba(34,163,90,.22)":"none",opacity:processing&&processing!==t.paddleId?.6:1}}>{processing===t.stripeId?"Processing…":t.cta+" →"}</button>
             </div>
           ))}
         </div>
         <div style={{textAlign:"center",marginTop:42,display:"flex",justifyContent:"center",gap:24,flexWrap:"wrap"}}>
-          {["🔒 Secure via Paddle","↩️ Cancel anytime","🥗 Food · 💪 Fitness · 🌬️ Breath · 🌙 Sleep"].map((s,i)=><span key={i} style={{color:"#1e3d25",fontSize:".86rem"}}>{s}</span>)}
+          {["🔒 Secure via Stripe","↩️ Cancel anytime","🥗 Food · 💪 Fitness · 🌬️ Breath · 🌙 Sleep"].map((s,i)=><span key={i} style={{color:"#1e3d25",fontSize:".86rem"}}>{s}</span>)}
         </div>
         <div style={{maxWidth:580,margin:"64px auto 0"}}>
           <h2 style={{textAlign:"center",fontSize:"1.45rem",fontWeight:400,color:"#a8ddb5",marginBottom:32}}>Questions</h2>
@@ -927,6 +915,23 @@ export default function App() {
         }
       }
     });
+    // Handle Stripe payment success redirect
+    const params = new URLSearchParams(window.location.search);
+    if(params.get("payment")==="success"){
+      window.history.replaceState({},"","/");
+      setTimeout(async()=>{
+        // Re-fetch profile to get updated credits from webhook
+        const {data:{session}}=await supabase.auth.getSession();
+        if(session?.user){
+          const profile=await fetchProfile(session.user.id);
+          if(profile){
+            const u={id:session.user.id,name:profile.name,email:profile.email,allergies:profile.allergies||[],credits:profile.credits??3,sex:profile.sex||"",history:profile.history||[]};
+            saveUser(u);setUser(u);userRef.current=u;
+            alert("✅ Payment successful! Your credits have been added.");
+          }
+        }
+      }, 2000);
+    }
     // Listen for auth changes (e.g. password reset redirect)
     const {data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
       if(event==="SIGNED_OUT"){clearUser();setUser(null);userRef.current=null;}
