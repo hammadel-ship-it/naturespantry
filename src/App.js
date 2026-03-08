@@ -335,10 +335,21 @@ function AuthModal({ onClose, onAuth, defaultMode="login" }) {
     setErr("");setLoading(true);
     try{
       const {error}=await supabase.auth.resetPasswordForEmail(email.trim(),{
-        redirectTo:"https://foodnfitness.ai/reset"
+        redirectTo:"https://foodnfitness.ai"
       });
       if(error)return setErr(error.message);
       setResetSent(true);
+    }catch(e){setErr(e.message);}finally{setLoading(false);}
+  };
+
+  const updatePassword=async()=>{
+    setErr("");setLoading(true);
+    try{
+      if(pass.length<6)return setErr("Password must be at least 6 characters.");
+      const {error}=await supabase.auth.updateUser({password:pass});
+      if(error)return setErr(error.message);
+      onClose();
+      alert("✅ Password updated successfully! Please sign in with your new password.");
     }catch(e){setErr(e.message);}finally{setLoading(false);}
   };
 
@@ -947,6 +958,11 @@ export default function App() {
     // Listen for auth changes (e.g. password reset redirect)
     const {data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
       if(event==="SIGNED_OUT"){clearUser();setUser(null);userRef.current=null;}
+      if(event==="PASSWORD_RECOVERY"){
+        // Open auth modal in reset mode so user can set new password
+        setAuthMode("reset");
+        setShowAuth(true);
+      }
     });
     return()=>subscription.unsubscribe();
   },[]);
