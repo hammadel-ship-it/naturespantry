@@ -578,7 +578,7 @@ const IMG = (id) => `https://images.unsplash.com/${id}?w=500&h=320&q=80&fit=crop
 const IMAGE_MAP = [
   // ── Specific named foods (most specific first) ────────────────────────────
   [["montmorency cherry","tart cherry","sour cherry"],  IMG("photo-1528821128474-27f963b062bf")],
-  [["black garlic","fermented garlic"],                  IMG("photo-1615485290382-441e4d049cb5")],
+  [["black garlic","fermented garlic"],                  IMG("photo-1593424946386-96dc53ed3d8e")],
   [["ceylon cinnamon","cinnamon bark","cinnamon"],       IMG("photo-1599789198809-0dd24a82dd14")],
   [["white willow bark","willow bark"],                  IMG("photo-1556679343-c7306c1976bc")],
   [["wild alaskan salmon","wild salmon"],                IMG("photo-1519708227418-c8fd9a32b7a2")],
@@ -594,8 +594,8 @@ const IMAGE_MAP = [
   [["cherry","cherries"],                                IMG("photo-1528821128474-27f963b062bf")],
   [["avocado"],                                          IMG("photo-1523049673857-eb18f1d7b578")],
   [["spinach","kale","watercress","arugula","leafy"],     IMG("photo-1576045057995-568f588f82fb")],
-  [["broccoli","cauliflower","brussels sprout"],         IMG("photo-1584270354949-c26b0d5b4a0c")],
-  [["garlic"],                                           IMG("photo-1615485290382-441e4d049cb5")],
+  [["broccoli","cauliflower","brussels sprout"],         IMG("photo-1459411552884-841db9b3cc2a")],
+  [["garlic"],                                           IMG("photo-1593424946386-96dc53ed3d8e")],
   [["egg","eggs"],                                       IMG("photo-1482049016688-2d3e1b311543")],
   [["oat","porridge","granola","oatmeal"],                IMG("photo-1517673132405-a56a62b18caf")],
   [["lemon","lime","citrus"],                             IMG("photo-1587486913049-53fc88980cfc")],
@@ -664,12 +664,22 @@ const PILLAR_FALLBACKS = {
   sleep:    IMG("photo-1541781774459-bb2af2f05b55"),
 };
 
-// getImageUrl: AI term tried first (both alone and combined with name),
-// then item name, then pillar fallback
+// getImageUrl: tries AI term, then full name, then each word pair in name
 function getImageUrl(name, pillarType, aiTerm) {
+  const nameL = (name || "").toLowerCase();
+  const aiL   = (aiTerm || "").toLowerCase();
+
+  // Build candidates: AI term, full name, then sliding 2-word windows of name
   const candidates = [];
-  if (aiTerm) candidates.push(aiTerm.toLowerCase());
-  if (name)   candidates.push(name.toLowerCase());
+  if (aiL)   candidates.push(aiL);
+  if (nameL) candidates.push(nameL);
+  // Also try word pairs e.g. "black garlic" from "Fermented Black Garlic"
+  const words = nameL.split(/\s+/);
+  for (let i = 0; i < words.length - 1; i++) {
+    candidates.push(words[i] + " " + words[i+1]);
+  }
+  // And single words
+  for (const w of words) if (w.length > 3) candidates.push(w);
 
   for (const str of candidates) {
     for (const [keywords, url] of IMAGE_MAP) {
