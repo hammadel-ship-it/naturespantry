@@ -739,10 +739,7 @@ function ItemDetailModal({ item, meta, pillarType, onClose, onDeepDive }) {
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 1000,
-          system: 'You are a wellness expert. Output ONLY a JSON object. No markdown, no backticks. Use double quotes. No apostrophes — write "do not" not "don't".
-
-Format: {"science":"2-3 sentences on the science/mechanism","howToUse":"Specific dosage, timing, preparation or technique","bestFor":["condition 1","condition 2","condition 3"],"combinations":["pairs well with X because Y","avoid combining with Z"],"quickTip":"One surprising specific tip"}',
-          messages: [{ role: "user", content: `Tell me everything about "${item.name}" for wellness. Benefit context: ${item.benefit}` }]
+          system: "You are a wellness expert. Output ONLY a JSON object. No markdown, no backticks. Use double quotes only. No contractions or apostrophes.\n\nFormat: {\"science\":\"2-3 sentences on mechanism\",\"howToUse\":\"Specific dosage and timing\",\"bestFor\":[\"condition 1\",\"condition 2\",\"condition 3\"],\"combinations\":[\"pairs well with X\",\"avoid Z\"],\"quickTip\":\"One surprising tip\"}",         messages: [{ role: "user", content: `Tell me everything about "${item.name}" for wellness. Benefit context: ${item.benefit}` }]
         })
       });
       const data = await res.json();
