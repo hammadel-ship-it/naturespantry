@@ -557,108 +557,101 @@ function SignUpPrompt({ onClose, onSignUp }) {
 }
 
 // ─── IMAGE SYSTEM ─────────────────────────────────────────────────────────────
-// Uses Unsplash topic-based URLs that reliably return relevant images
-// Format: https://images.unsplash.com/photo-{id}?w=400&q=80&fit=crop
 
-const WELLNESS_IMAGES = {
-  // Foods & nutrition
-  turmeric:       "photo-1615485500704-8e990f9900f7",
-  ginger:         "photo-1573506254977-9a6e4f14e7d9",
-  blueberry:      "photo-1457296898342-cdd24585d095",
-  salmon:         "photo-1519708227418-c8fd9a32b7a2",
-  avocado:        "photo-1523049673857-eb18f1d7b578",
-  spinach:        "photo-1576045057995-568f588f82fb",
-  broccoli:       "photo-1584270354949-c26b0d5b4a0c",
-  oat:            "photo-1517673132405-a56a62b18caf",
-  egg:            "photo-1482049016688-2d3e1b311543",
-  lemon:          "photo-1587486913049-53fc88980cfc",
-  garlic:         "photo-1615485290382-441e4d049cb5",
-  mushroom:       "photo-1506905925346-21bda4d32df4",
-  walnut:         "photo-1508061253366-f7da158b6d46",
-  almond:         "photo-1509358271058-acd22cc9389",
-  berry:          "photo-1576673442511-7e39b6545c87",
-  greens:         "photo-1576045057995-568f588f82fb",
-  watercress:     "photo-1576045057995-568f588f82fb",
-  kimchi:         "photo-1569050467447-ce54b3bbc37d",
-  miso:           "photo-1547592180-85f173990554",
-  kefir:          "photo-1488477181946-6428a0291777",
-  matcha:         "photo-1515823662972-da6a2e4d3002",
-  ashwagandha:    "photo-1532187863486-abf9dbad1b69",
-  beetroot:       "photo-1593789382576-fca9e7bafcd6",
-  "sweet potato": "photo-1596097635121-14b38c5d7f29",
-  quinoa:         "photo-1586201375761-83865001e31c",
-  lentil:         "photo-1515543904379-3d757dda9578",
-  chickpea:       "photo-1515543904379-3d757dda9578",
-  cherry:         "photo-1528821128474-27f963b062bf",
-  pomegranate:    "photo-1615485736208-84e11f6f7d42",
-  celery:         "photo-1452195100486-9cc805987862",
-  cucumber:       "photo-1604977042946-1eecc30f269e",
-  collagen:       "photo-1571019613454-1cb2f99b2d8b",
-  omega:          "photo-1519708227418-c8fd9a32b7a2",
-  chamomile:      "photo-1544787219-7f47ccb76574",
-  lavender:       "photo-1611909023032-2d6b3134ecba",
-  pineapple:      "photo-1490474418585-ba9bad8fd0ea",
-  grapefruit:     "photo-1587132137056-bfbf0166836e",
-  kale:           "photo-1506905925346-21bda4d32df4",
-  "bone broth":   "photo-1547592180-85f173990554",
-  "tart cherry":  "photo-1528821128474-27f963b062bf",
-  magnesium:      "photo-1532187863486-abf9dbad1b69",
-  zinc:           "photo-1532187863486-abf9dbad1b69",
-  // Exercises & movement
-  yoga:           "photo-1506126613408-eca07ce68773",
-  meditation:     "photo-1545389336-cf090694435e",
-  walking:        "photo-1571019614242-c5c5dee9f50b",
-  running:        "photo-1483721310020-03333e577078",
-  swimming:       "photo-1530549387789-4c1017266635",
-  cycling:        "photo-1558618666-fcd25c85cd64",
-  stretching:     "photo-1544367567-0f2fcb009e0b",
-  pilates:        "photo-1518611012118-696072aa579a",
-  hiit:           "photo-1534438327276-14e5300c3a48",
-  strength:       "photo-1534438327276-14e5300c3a48",
-  plank:          "photo-1518611012118-696072aa579a",
-  squat:          "photo-1574680178050-55c6a6a96e0a",
-  deadlift:       "photo-1534438327276-14e5300c3a48",
-  pushup:         "photo-1571019614242-c5c5dee9f50b",
-  "foam roll":    "photo-1518611012118-696072aa579a",
-  "cold shower":  "photo-1571019613454-1cb2f99b2d8b",
-  sauna:          "photo-1545389336-cf090694435e",
-  journal:        "photo-1455390582262-044cdead277a",
-  gratitude:      "photo-1455390582262-044cdead277a",
-  // Breathwork & sleep
-  breath:         "photo-1545389336-cf090694435e",
-  sleep:          "photo-1541781774459-bb2af2f05b55",
-  rest:           "photo-1541781774459-bb2af2f05b55",
-  nap:            "photo-1541781774459-bb2af2f05b55",
-  // Elevation / positioning
-  elevation:      "photo-1541781774459-bb2af2f05b55",
-  pillow:         "photo-1541781774459-bb2af2f05b55",
-  "blue light":   "photo-1512428559087-560fa5ceab42",
-  "cool room":    "photo-1541781774459-bb2af2f05b55",
-  "cold water":   "photo-1571019613454-1cb2f99b2d8b",
+const IMG = (id) => `https://images.unsplash.com/${id}?w=500&h=320&q=80&fit=crop&auto=format`;
+
+// Keyword → Unsplash photo ID. Ordered from most specific to most general.
+const IMAGE_MAP = [
+  // ── Specific foods ────────────────────────────────────────────────────────
+  [["tart cherry","cherry juice","cherry"],              IMG("photo-1528821128474-27f963b062bf")],
+  [["black garlic","garlic"],                            IMG("photo-1615485290382-441e4d049cb5")],
+  [["wild sardine","sardine","anchovy"],                 IMG("photo-1519708227418-c8fd9a32b7a2")],
+  [["white willow","willow bark"],                       IMG("photo-1544787219-7f47ccb76574")],
+  [["bone broth","broth"],                               IMG("photo-1547592180-85f173990554")],
+  [["turmeric latte","golden milk"],                     IMG("photo-1615485500704-8e990f9900f7")],
+  [["turmeric"],                                         IMG("photo-1615485500704-8e990f9900f7")],
+  [["ginger","ginger tea"],                              IMG("photo-1573506254977-9a6e4f14e7d9")],
+  [["matcha"],                                           IMG("photo-1515823662972-da6a2e4d3002")],
+  [["chamomile","herbal tea","tea"],                     IMG("photo-1544787219-7f47ccb76574")],
+  [["salmon","omega-3","fish oil","sardine","mackerel"], IMG("photo-1519708227418-c8fd9a32b7a2")],
+  [["blueberr","acai","berry","berries"],                IMG("photo-1457296898342-cdd24585d095")],
+  [["avocado"],                                          IMG("photo-1523049673857-eb18f1d7b578")],
+  [["spinach","kale","leafy","greens","watercress"],     IMG("photo-1576045057995-568f588f82fb")],
+  [["broccoli","crucifer"],                              IMG("photo-1584270354949-c26b0d5b4a0c")],
+  [["egg","eggs"],                                       IMG("photo-1482049016688-2d3e1b311543")],
+  [["oat","porridge","granola"],                         IMG("photo-1517673132405-a56a62b18caf")],
+  [["lemon","citrus"],                                   IMG("photo-1587486913049-53fc88980cfc")],
+  [["mushroom","reishi","lion's mane","chaga"],          IMG("photo-1506905925346-21bda4d32df4")],
+  [["walnut","almond","nut","cashew","pistachio"],       IMG("photo-1508061253366-f7da158b6d46")],
+  [["quinoa","grain","rice"],                            IMG("photo-1586201375761-83865001e31c")],
+  [["lentil","chickpea","legume","bean"],                IMG("photo-1515543904379-3d757dda9578")],
+  [["sweet potato","yam"],                               IMG("photo-1596097635121-14b38c5d7f29")],
+  [["beetroot","beet"],                                  IMG("photo-1593789382576-fca9e7bafcd6")],
+  [["kimchi","ferment","sauerkraut","probiotic"],        IMG("photo-1569050467447-ce54b3bbc37d")],
+  [["kefir","yogurt","dairy"],                           IMG("photo-1488477181946-6428a0291777")],
+  [["pomegranate"],                                      IMG("photo-1615485736208-84e11f6f7d42")],
+  [["pineapple","bromelain"],                            IMG("photo-1490474418585-ba9bad8fd0ea")],
+  [["smoothie","juice","drink"],                         IMG("photo-1553530666-ba11a90a3332")],
+  [["collagen","gelatin"],                               IMG("photo-1571019613454-1cb2f99b2d8b")],
+  [["ashwagandha","adaptogen","herb","supplement"],      IMG("photo-1532187863486-abf9dbad1b69")],
+  [["magnesium","zinc","vitamin","mineral"],             IMG("photo-1532187863486-abf9dbad1b69")],
+  [["celery","cucumber","vegetable"],                    IMG("photo-1452195100486-9cc805987862")],
+  [["lavender","aromatherapy","essential oil"],          IMG("photo-1611909023032-2d6b3134ecba")],
+  // ── Exercise & movement ───────────────────────────────────────────────────
+  [["yoga","yin yoga","restorative yoga"],               IMG("photo-1506126613408-eca07ce68773")],
+  [["pilates","mat work"],                               IMG("photo-1518611012118-696072aa579a")],
+  [["stretch","hip flexor","hamstring","mobility"],      IMG("photo-1544367567-0f2fcb009e0b")],
+  [["foam roll","roller","self-massage","massage"],      IMG("photo-1544367567-0f2fcb009e0b")],
+  [["joint circle","joint rotation","gentle movement"],  IMG("photo-1518611012118-696072aa579a")],
+  [["lymph","arm swing","lymphatic"],                    IMG("photo-1571019614242-c5c5dee9f50b")],
+  [["wall calf","calf stretch","calf raise"],            IMG("photo-1544367567-0f2fcb009e0b")],
+  [["finger tendon","hand exercise","wrist"],            IMG("photo-1518611012118-696072aa579a")],
+  [["walk","stroll","hiking","nature walk"],             IMG("photo-1571019614242-c5c5dee9f50b")],
+  [["run","jog","sprint"],                               IMG("photo-1483721310020-03333e577078")],
+  [["swim","pool","water"],                              IMG("photo-1530549387789-4c1017266635")],
+  [["cycle","bike","cycling"],                           IMG("photo-1558618666-fcd25c85cd64")],
+  [["hiit","interval","circuit"],                        IMG("photo-1534438327276-14e5300c3a48")],
+  [["strength","weight","resistance","deadlift","squat"],IMG("photo-1534438327276-14e5300c3a48")],
+  [["plank","core","abdominal"],                         IMG("photo-1518611012118-696072aa579a")],
+  [["pushup","push-up","bodyweight"],                    IMG("photo-1571019614242-c5c5dee9f50b")],
+  [["tai chi","qigong","chi gong"],                      IMG("photo-1506126613408-eca07ce68773")],
+  [["dance","zumba"],                                    IMG("photo-1571019614242-c5c5dee9f50b")],
+  // ── Breathwork & stress ───────────────────────────────────────────────────
+  [["box breath","4-4-4","square breath"],               IMG("photo-1545389336-cf090694435e")],
+  [["4-7-8","478 breath"],                               IMG("photo-1545389336-cf090694435e")],
+  [["humming","bee breath","bhramari"],                  IMG("photo-1545389336-cf090694435e")],
+  [["alternate nostril","nadi shodhana"],                IMG("photo-1545389336-cf090694435e")],
+  [["breath","breathing","pranayama","inhale","exhale"], IMG("photo-1545389336-cf090694435e")],
+  [["meditat","mindful","awareness","present"],          IMG("photo-1545389336-cf090694435e")],
+  [["cold shower","cold water","ice bath","cold plunge"],IMG("photo-1571019613454-1cb2f99b2d8b")],
+  [["sauna","steam","heat therapy"],                     IMG("photo-1571019613454-1cb2f99b2d8b")],
+  [["journal","writing","gratitude","diary"],            IMG("photo-1455390582262-044cdead277a")],
+  // ── Sleep & recovery ──────────────────────────────────────────────────────
+  [["red light","light therapy","photobiomodulation"],   IMG("photo-1512428559087-560fa5ceab42")],
+  [["binaural","sound therapy","frequency","40hz"],      IMG("photo-1512428559087-560fa5ceab42")],
+  [["blue light","screen","device"],                     IMG("photo-1512428559087-560fa5ceab42")],
+  [["cool room","bedroom temp","temperature","thermostat"],IMG("photo-1541781774459-bb2af2f05b55")],
+  [["elevation","pillow","sleep position","positioning"],IMG("photo-1541781774459-bb2af2f05b55")],
+  [["sleep hygiene","wind down","bedtime routine"],      IMG("photo-1541781774459-bb2af2f05b55")],
+  [["nap","rest","recovery","sleep"],                    IMG("photo-1541781774459-bb2af2f05b55")],
+  [["earthing","grounding","barefoot"],                  IMG("photo-1571019614242-c5c5dee9f50b")],
+];
+
+// Category fallbacks per pillar — used when no keyword matches
+const PILLAR_FALLBACKS = {
+  food:     IMG("photo-1490645935967-10de6ba17061"),  // beautiful food spread
+  exercise: IMG("photo-1506126613408-eca07ce68773"),  // yoga/movement
+  breath:   IMG("photo-1545389336-cf090694435e"),     // meditation
+  sleep:    IMG("photo-1541781774459-bb2af2f05b55"),  // peaceful sleep
 };
 
-// Robust image URL builder — always returns a working Unsplash image
-function getImageUrl(name) {
+function getImageUrl(name, pillarType) {
   const lower = (name || "").toLowerCase();
-  // Try exact keyword matches first
-  for (const [key, id] of Object.entries(WELLNESS_IMAGES)) {
-    if (lower.includes(key)) {
-      return `https://images.unsplash.com/${id}?w=400&h=280&q=80&fit=crop&auto=format`;
-    }
+  for (const [keywords, url] of IMAGE_MAP) {
+    if (keywords.some(k => lower.includes(k))) return url;
   }
-  // Smart category fallback based on common wellness terms
-  if (/sleep|rest|night|bed|insomnia|recovery/.test(lower))
-    return "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=400&h=280&q=80&fit=crop";
-  if (/breath|calm|meditat|stress|anxiety|mind/.test(lower))
-    return "https://images.unsplash.com/photo-1545389336-cf090694435e?w=400&h=280&q=80&fit=crop";
-  if (/exercise|move|workout|train|run|walk|stretch|yoga|gym/.test(lower))
-    return "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=400&h=280&q=80&fit=crop";
-  if (/food|eat|meal|diet|nutrition|recipe|drink|juice|smoothie/.test(lower))
-    return "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&h=280&q=80&fit=crop";
-  if (/supplement|vitamin|mineral|herb|extract|powder/.test(lower))
-    return "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=400&h=280&q=80&fit=crop";
-  // Final fallback — beautiful nature/wellness image
-  return "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&h=280&q=80&fit=crop";
+  // Use pillar-specific fallback
+  return PILLAR_FALLBACKS[pillarType] || PILLAR_FALLBACKS.food;
 }
 
 
@@ -716,12 +709,12 @@ function TipRow({ tip }) {
   );
 }
 
-function ItemCard({ item, meta }) {
+function ItemCard({ item, meta, pillarType }) {
   const [imgErr, setImgErr] = useState(false);
-  const imgUrl = getImageUrl(item.name);
+  const imgUrl = getImageUrl(item.name, pillarType);
   return(
-    <div className="item-card" style={{background:meta.bg,border:"1px solid "+meta.border,borderRadius:18,overflow:"hidden",transition:"transform .2s, box-shadow .2s",animation:"fadeUp .3s ease both",display:"flex",flexDirection:"column",minHeight:280}}>
-      <div style={{width:"100%",height:160,overflow:"hidden",position:"relative",background:"rgba(0,0,0,.25)",flexShrink:0}}>
+    <div className="item-card" style={{background:meta.bg,border:"1px solid "+meta.border,borderRadius:18,overflow:"hidden",transition:"transform .2s, box-shadow .2s",animation:"fadeUp .3s ease both",display:"flex",flexDirection:"column",minHeight:290}}>
+      <div style={{width:"100%",height:170,overflow:"hidden",position:"relative",background:"rgba(0,0,0,.25)",flexShrink:0}}>
         {!imgErr ? (
           <img
             src={imgUrl}
@@ -730,12 +723,11 @@ function ItemCard({ item, meta }) {
             style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
           />
         ) : (
-          <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:56}}>
+          <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:64,background:meta.bg}}>
             {item.emoji||"🌿"}
           </div>
         )}
-        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.55))"}}/>
-        <div style={{position:"absolute",bottom:10,left:12,fontSize:28}}>{item.emoji||"🌿"}</div>
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,transparent 55%,rgba(0,0,0,.6))"}}/>
       </div>
       <div style={{padding:"14px 16px",flex:1,display:"flex",flexDirection:"column",gap:7}}>
         <div style={{color:"#c8ecd4",fontSize:"1.05rem",fontWeight:700,lineHeight:1.3}}>{item.name}</div>
@@ -759,7 +751,7 @@ function PillarGrid({ pillars }) {
             </div>
             <div className="np-item-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
               {(pillar.items||[]).map((item,i)=>(
-                <ItemCard key={i} item={item} meta={meta}/>
+                <ItemCard key={i} item={item} meta={meta} pillarType={pillar.type}/>
               ))}
             </div>
           </div>
