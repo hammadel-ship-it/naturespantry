@@ -36,67 +36,94 @@ const PILLAR_META = {
 
 const ALLERGIES = ["Gluten","Dairy","Nuts","Soy","Eggs","Shellfish","Fish","Sesame"];
 
-const TIERS = [
-  { name:"Starter",  price:"£3",  per:"one-time",  searches:"10 searches", rate:"£0.30 / search", desc:"Try it out. No commitment.", cta:"Get Started", highlight:false, stripeId:"price_1T8hNmCJF4DF72elItDLqZIp", features:["10 AI wellness searches","Food, fitness & breathwork","Personalised to your body","Never expires"] },
-  { name:"Thrive",   price:"£9",  per:"per month", searches:"40 searches", rate:"£0.23 / search", desc:"For those committed to feeling their best.", cta:"Start Thriving", highlight:true, stripeId:"price_1T8hOyCJF4DF72elWJQpeY94", badge:"Most Popular", features:["40 searches / month","All 4 wellness pillars","Personalised responses","Best value monthly"] },
-  { name:"Optimise", price:"£19", per:"per month", searches:"Unlimited",   rate:"No limits ever", desc:"For those who make wellness a daily practice.", cta:"Start Optimising", highlight:false, stripeId:"price_1T8hPUCJF4DF72el0FctAFJv", features:["Unlimited searches","All 4 wellness pillars","Full personalisation","Best value for daily use"] },
+// Pricing removed — app is now free
+
+// ─── SYSTEM PROMPT ─────────────────────────────────────────────────────────
+
+const VARIETY_SEEDS = [
+  "Draw from Ayurvedic, Mediterranean, and East Asian wellness traditions.",
+  "Focus on evidence-based nutrition science and sports physiology.",
+  "Draw from traditional Chinese medicine and modern functional medicine.",
+  "Blend Scandinavian lifestyle principles with modern nutritional science.",
+  "Focus on gut-brain axis research and microbiome-supporting recommendations.",
+  "Draw from Japanese longevity research and Blue Zone dietary patterns.",
+  "Focus on hormonal balance, circadian rhythm, and chronobiology.",
+  "Blend ancient herbal traditions with modern adaptogen science.",
 ];
 
-// ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
+const TIME_CONTEXT = () => {
+  const h = new Date().getHours();
+  if (h < 6)  return "It is very early morning (before 6am). Suggest gentle, restorative practices.";
+  if (h < 10) return "It is morning. Energising, activating recommendations are ideal.";
+  if (h < 14) return "It is midday. Focus on sustaining energy and mental clarity.";
+  if (h < 18) return "It is afternoon. Recommendations should support sustained energy without disrupting sleep.";
+  if (h < 21) return "It is evening. Wind-down, recovery and sleep-prep recommendations are ideal.";
+  return "It is late evening or night. Prioritise calming, sleep-supporting recommendations only.";
+};
+
+const SEASON_CONTEXT = () => {
+  const m = new Date().getMonth();
+  if (m <= 1 || m === 11) return "It is winter. Prioritise warming foods, immunity, vitamin D, and cosy indoor practices.";
+  if (m <= 4) return "It is spring. Emphasise cleansing foods, fresh produce, and renewed energy.";
+  if (m <= 7) return "It is summer. Focus on hydration, cooling foods, and outdoor movement.";
+  return "It is autumn. Prioritise grounding foods, immune preparation, and sleep hygiene.";
+};
 
 const buildPrompt = (user, isFollowUp) => {
   const allergy = user?.allergies?.length
-    ? "CRITICAL ALLERGY: Never recommend " + user.allergies.join(", ") + " or any derivatives."
+    ? "CRITICAL ALLERGY — NEVER recommend " + user.allergies.join(", ") + " or any derivatives. Check every single item."
     : "";
   const history = user?.history?.length
-    ? "Prior concerns: " + user.history.slice(-4).map(h=>h.query).join("; ") + "."
+    ? "User has previously asked about: " + user.history.slice(-6).map(h=>h.query).join("; ") + ". Do NOT repeat the same recommendations."
     : "";
   const sexNote = user?.sex === "female"
-    ? "User is female: prioritise iron, oestrogen support, cycle nutrition."
+    ? "User is female: consider iron, oestrogen balance, cycle-phase nutrition, collagen."
     : user?.sex === "male"
-    ? "User is male: prioritise testosterone support, muscle recovery, zinc, magnesium."
+    ? "User is male: consider testosterone support, muscle recovery, zinc, magnesium, prostate health."
     : "";
+  const seed = VARIETY_SEEDS[Math.floor(Math.random() * VARIETY_SEEDS.length)];
+  const timeCtx = TIME_CONTEXT();
+  const seasonCtx = SEASON_CONTEXT();
+
+  const baseRules = "OUTPUT RULES — FOLLOW EXACTLY:\n" +
+    "1. Output ONLY a JSON object. Zero text before or after it.\n" +
+    "2. No markdown. No backticks. No code fences.\n" +
+    "3. Use double quotes for all strings. No single quotes. Write do not instead of dont, you will instead of youll.\n" +
+    "4. No newlines inside string values. Keep all strings on one line.\n" +
+    "5. No trailing commas.\n";
 
   if (!isFollowUp) {
-    return "You are a holistic wellness coach. " + allergy + " " + history + " " + sexNote + "\n\n" +
-      "OUTPUT RULES - FOLLOW EXACTLY:\n" +
-      "1. Output ONLY a JSON object. Zero text before or after it.\n" +
-      "2. No markdown. No backticks. No code fences.\n" +
-      "3. Use double quotes for all strings. No single quotes. No apostrophes or contractions - write do not instead of dont, you will instead of youll.\n" +
-      "4. No newlines inside string values. Keep all strings on one line.\n" +
-      "5. No trailing commas.\n\n" +
-      "JSON format (copy this structure exactly):\n" +
-      '{"responseType":"initial","acknowledgment":"YOUR TEXT HERE","pillars":[{"type":"food","label":"Food and Nutrition","items":[{"emoji":"🫐","name":"Food name","benefit":"One sentence benefit"}]},{"type":"exercise","label":"Exercise and Movement","items":[{"emoji":"🏃","name":"Exercise name","benefit":"How to do it with duration"}]}],"recipes":[{"name":"Recipe name","emoji":"🥣","ingredients":["item 1","item 2"],"steps":["Step 1","Step 2","Step 3"]}],"tip":"One specific actionable tip"}\n\n' +
+    return "You are a world-class holistic wellness coach with deep expertise across nutrition, movement, breathwork and sleep science. " +
+      seed + " " + timeCtx + " " + seasonCtx + " " + sexNote + " " + history + "\n\n" +
+      baseRules + "\n" +
+      "JSON format:\n" +
+      '{"responseType":"initial","acknowledgment":"2 warm empathetic sentences referencing their exact words and situation","pillars":[{"type":"food","label":"Food and Nutrition","items":[{"emoji":"🫐","name":"Specific food or supplement name","benefit":"Precise mechanism and how to use it — be specific about quantity, timing or preparation"}]},{"type":"exercise","label":"Exercise and Movement","items":[{"emoji":"🏃","name":"Specific exercise name","benefit":"Exact technique, sets, reps or duration — actionable detail"}]}],"recipes":[{"name":"Recipe name","emoji":"🥣","ingredients":["specific amount + ingredient"],"steps":["Precise step"]}],"tip":"One hyper-specific, surprising, actionable tip they likely have not heard before"}' + "\n\n" +
       "CONTENT RULES:\n" +
-      "- acknowledgment: 2 warm sentences referencing their exact words\n" +
-      "- pillars: include 2 to 3 pillars relevant to the query. Types allowed: food, exercise, breath, sleep\n" +
-      "- items: 3 to 4 per pillar. Each needs emoji, name, benefit\n" +
-      "- recipes: 1 or 2 recipes. Max 3 steps each\n" +
-      "- tip: one hyper-specific actionable tip\n" +
+      "- acknowledgment: warm, specific, never generic\n" +
+      "- pillars: always include ALL 4 types (food, exercise, breath, sleep) — vary the order\n" +
+      "- items: 4 per pillar. Be SPECIFIC — not 'leafy greens' but 'Watercress' with a precise benefit\n" +
+      "- recipes: 2 recipes directly addressing the concern. Include exact quantities in ingredients\n" +
+      "- tip: must be surprising and hyper-specific. Not 'drink more water' — something genuinely useful\n" +
+      "- VARIETY: draw from different cultures, traditions and science. Avoid the most obvious recommendations\n" +
       allergy;
   } else {
-    return "You are a holistic wellness coach continuing a conversation. " + allergy + " " + sexNote + "\n\n" +
-      "OUTPUT RULES - FOLLOW EXACTLY:\n" +
-      "1. Output ONLY a JSON object. Zero text before or after it.\n" +
-      "2. No markdown. No backticks. No code fences.\n" +
-      "3. Use double quotes. No single quotes. No apostrophes or contractions - write do not instead of dont, you will instead of youll.\n" +
-      "4. No newlines inside string values.\n" +
-      "5. No trailing commas.\n\n" +
-      "Pick ONE of these response types based on what the user asked:\n\n" +
-      "If they want more foods or practices:\n" +
-      '{"responseType":"items","acknowledgment":"1-2 sentences","pillars":[{"type":"food","label":"Foods","items":[{"emoji":"🌿","name":"Name","benefit":"Benefit"}]}],"tip":"tip"}\n\n' +
-      "If they want a recipe or protocol:\n" +
-      '{"responseType":"recipe","acknowledgment":"1-2 sentences","recipes":[{"name":"Name","emoji":"🥣","ingredients":["item"],"steps":["step"]}],"tip":"tip"}\n\n' +
-      "If they want lifestyle insight:\n" +
-      '{"responseType":"insight","acknowledgment":"1-2 sentences","cards":[{"emoji":"🌿","title":"Short title","body":"1-2 sentences","pillar":"food"}],"tip":"tip"}\n\n' +
-      "If they have a specific question:\n" +
-      '{"responseType":"answer","acknowledgment":"1-2 sentences","cards":[{"emoji":"🌿","title":"Short title","body":"1-2 sentences","pillar":"food"}],"tip":"tip"}\n\n' +
-      "CONTENT RULES:\n" +
-      "- 3 to 5 items or cards\n" +
-      "- pillar field must be one of: food, exercise, breath, sleep\n" +
-      "- Be specific and use emojis\n" +
+    return "You are a world-class holistic wellness coach continuing a conversation. " +
+      seed + " " + timeCtx + " " + sexNote + "\n\n" +
+      baseRules + "\n" +
+      "Pick the BEST response type for what the user asked:\n\n" +
+      'If they want more foods, supplements or practices: {"responseType":"items","acknowledgment":"1-2 specific sentences","pillars":[{"type":"food","label":"Foods","items":[{"emoji":"🌿","name":"Specific name","benefit":"Precise benefit with mechanism"}]}],"tip":"surprising specific tip"}\n\n' +
+      'If they want a recipe, protocol or plan: {"responseType":"recipe","acknowledgment":"1-2 sentences","recipes":[{"name":"Name","emoji":"🥣","ingredients":["amount + ingredient"],"steps":["precise step"]}],"tip":"tip"}\n\n' +
+      'If they want deeper understanding or science: {"responseType":"insight","acknowledgment":"1-2 sentences","cards":[{"emoji":"🔬","title":"Short specific title","body":"Fascinating, specific insight with mechanism — 2-3 sentences","pillar":"food"}],"tip":"tip"}\n\n' +
+      'If they have a specific question: {"responseType":"answer","acknowledgment":"1-2 sentences","cards":[{"emoji":"🌿","title":"Short title","body":"Precise answer with specific details — 2-3 sentences","pillar":"food"}],"tip":"tip"}\n\n' +
+      "RULES:\n" +
+      "- 4 to 5 items or cards\n" +
+      "- pillar must be: food, exercise, breath, or sleep\n" +
+      "- Be specific, varied, and draw from different wellness traditions\n" +
+      "- Never repeat recommendations from earlier in the conversation\n" +
       allergy;
   }
+};
+
 };
 
 const buildWeekPlanPrompt = (user, concern) => {
@@ -332,7 +359,7 @@ function AuthModal({ onClose, onAuth, defaultMode="login" }) {
             credits:3,
             tier:"free"
           });
-          const u={id:data.user.id,name:name.trim(),email:email.trim(),allergies,credits:3,sex:"",history:[]};
+          const u={id:data.user.id,name:name.trim(),email:email.trim(),allergies,credits:3,sex:"",history:[]};if(window.tlTrack)window.tlTrack('signup_completed',{plan:'free'});
           saveUser(u);onAuth(u);
         }
       } else {
@@ -480,7 +507,7 @@ function ProfileModal({ user, onClose, onUpdate, onLogout, onUpgrade }) {
   return(
     <Modal onClose={onClose}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{color:"#a8ddb5",fontSize:"1.05rem"}}>👤 {user.name}</span><button onClick={onClose} style={{background:"none",border:"none",color:"#3a6644",cursor:"pointer",fontSize:"1.1rem"}}>✕</button></div>
-      <div style={{color:"#2e5535",fontSize:".85rem",marginBottom:20}}>{user.email} · {user.history?.length||0} searches · <span style={{color:(user.tier==="optimise")?"#5ed880":(user.credits??0)<=1?"#f09090":(user.credits??0)<=2?"#ffc85a":"#5ed880"}}>{user.tier==="optimise"?"∞ Unlimited credits":(user.credits??0)+" credits"}</span>{user.tier&&user.tier!=="free"&&<span style={{marginLeft:6,color:"#4ec97a",fontSize:".78rem",textTransform:"capitalize"}}>· {user.tier} plan</span>}</div>
+      <div style={{color:"#2e5535",fontSize:".85rem",marginBottom:20}}>{user.email} · {user.history?.length||0} searches</div>
       <div style={{marginBottom:20}}>
         <div style={{color:"#4a7a56",fontSize:".78rem",letterSpacing:".1em",textTransform:"uppercase",marginBottom:10}}>Biological sex <span style={{color:"#2a4a30",fontStyle:"italic",letterSpacing:0,textTransform:"none",fontSize:".74rem"}}>(personalises results)</span></div>
         <div style={{display:"flex",gap:8}}>{SEX.map(opt=>{const active=sex===opt.value;return<button key={opt.value} onClick={()=>setSex(active?"":opt.value)} style={{flex:1,background:active?"rgba(34,163,90,.18)":"rgba(255,255,255,.04)",border:"1.5px solid "+(active?"rgba(34,163,90,.55)":"rgba(255,255,255,.1)"),borderRadius:14,padding:"12px 8px",cursor:"pointer",transition:"all .16s",display:"flex",flexDirection:"column",alignItems:"center",gap:5}}><span style={{fontSize:20}}>{opt.icon}</span><span style={{color:active?"#5ed880":"#4a7a56",fontSize:".84rem",fontFamily:"'Georgia',serif"}}>{opt.label}</span></button>;})}</div>
@@ -492,8 +519,8 @@ function ProfileModal({ user, onClose, onUpdate, onLogout, onUpgrade }) {
         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{ALLERGIES.map(a=><button key={a} onClick={()=>toggle(a)} style={{background:allergies.includes(a)?"rgba(34,163,90,.22)":"rgba(255,255,255,.04)",border:"1px solid "+(allergies.includes(a)?"rgba(34,163,90,.55)":"rgba(255,255,255,.1)"),borderRadius:20,padding:"4px 11px",color:allergies.includes(a)?"#5ed880":"#4a7a56",fontSize:".84rem",cursor:"pointer",transition:"all .14s"}}>{a}</button>)}</div>
       </div>
       <div style={{display:"flex",gap:9,marginBottom:9}}><button onClick={save} disabled={saving} className="cta-btn" style={{flex:1,background:"linear-gradient(135deg,#22a35a,#1a7a44)",border:"none",borderRadius:10,padding:"11px",color:"#e8f5eb",fontSize:".85rem",cursor:"pointer",fontWeight:600}}>{saving?"Saving…":"Save"}</button><button onClick={logout} style={{background:"rgba(220,80,80,.08)",border:"1px solid rgba(220,80,80,.22)",borderRadius:10,padding:"11px 16px",color:"#f09090",fontSize:".85rem",cursor:"pointer"}}>Sign out</button></div>
-      {user.tier&&user.tier!=="free"&&<button onClick={manageSubscription} disabled={portalLoading} style={{width:"100%",background:"rgba(255,255,255,.03)",border:"1px solid rgba(80,180,100,.18)",borderRadius:10,padding:"10px",color:"#4a7a56",fontSize:".82rem",cursor:"pointer"}}>{portalLoading?"Loading…":"⚙️ Manage / cancel subscription"}</button>}
-      {(!user.tier||user.tier==="free"||user.tier==="starter")&&<button onClick={onUpgrade} style={{width:"100%",background:"rgba(34,163,90,.07)",border:"1px solid rgba(34,163,90,.22)",borderRadius:10,padding:"10px",color:"#4ec97a",fontSize:".82rem",cursor:"pointer",marginTop:user.tier&&user.tier!=="free"?6:0}}>⬆️ Upgrade plan</button>}
+
+
     </Modal>
   );
 }
@@ -951,7 +978,7 @@ export default function App() {
   const [showAuth,setShowAuth]=useState(false);
   const [authMode,setAuthMode]=useState("login");
   const [showProfile,setShowProfile]=useState(false);
-  const [showNoCredits,setShowNoCredits]=useState(false);
+
   const [showSignUp,setShowSignUp]=useState(false);
   const [guestSearches,setGuestSearches]=useState(()=>{try{return parseInt(localStorage.getItem("np_guest_searches")||"0");}catch{return 0;}});
   const getGuestCount=()=>{try{return parseInt(localStorage.getItem("np_guest_searches")||"0");}catch{return 0;}};
@@ -980,32 +1007,7 @@ export default function App() {
         }
       }
     });
-    // Handle Stripe payment success redirect
-    const params = new URLSearchParams(window.location.search);
-    if(params.get("payment")==="success"){
-      window.history.replaceState({},"","/");
-      // Poll Supabase until credits are updated (webhook may take a few seconds)
-      let attempts = 0;
-      const pollCredits = async() => {
-        attempts++;
-        const {data:{session}}=await supabase.auth.getSession();
-        if(session?.user){
-          const profile=await fetchProfile(session.user.id);
-          if(profile){
-            const prevCredits = userRef.current?.credits ?? 0;
-            if(profile.credits !== prevCredits || profile.tier !== "free" || attempts >= 8){
-              const u={id:session.user.id,name:profile.name,email:profile.email,allergies:profile.allergies||[],credits:profile.credits??3,tier:profile.tier||"free",sex:profile.sex||"",history:profile.history||[]};
-              saveUser(u);setUser(u);userRef.current=u;
-              loadConversationsRemote(session.user.id).then(convs=>saveConversationsLocal(convs));
-              alert("✅ Payment successful! Your credits have been updated.");
-              return;
-            }
-          }
-        }
-        if(attempts < 8) setTimeout(pollCredits, 2000);
-      };
-      setTimeout(pollCredits, 2000);
-    }
+
     // Listen for auth changes (e.g. password reset redirect)
     const {data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
       if(event==="SIGNED_OUT"){clearUser();setUser(null);userRef.current=null;}
@@ -1027,12 +1029,10 @@ export default function App() {
 
   const recordSuccess=async(isFollowUp,q)=>{
     const cu=userRef.current; if(!cu)return;
-    const newCredits=Math.max(0,parseFloat(((cu.credits??0)-1).toFixed(1)));
     const newHistory=[...(cu.history||[]),{query:q,date:Date.now()}].slice(-50);
-    const updated={...cu,credits:newCredits,history:newHistory};
+    const updated={...cu,history:newHistory};
     saveUser(updated);setUser(updated);userRef.current=updated;
-    // Persist credit deduction and history to Supabase
-    if(cu.id) await upsertProfile(cu.id,{credits:newCredits,history:newHistory});
+    if(cu.id) await upsertProfile(cu.id,{history:newHistory});
   };
 
   const fetchWeekPlan=async(concern)=>{
@@ -1051,8 +1051,8 @@ export default function App() {
   const handleQuery=async(query)=>{
     const q=query.trim();if(!q||loading)return;
     const isFollowUp=messages.some(m=>m.role==="assistant");
-    if(!user){const c=getGuestCount();if(c>=1){setShowSignUp(true);return;}const n=c+1;localStorage.setItem("np_guest_searches",String(n));setGuestSearches(n);}
-    if(user&&user.tier!=="optimise"&&(user.credits??0)<1){setShowNoCredits(true);return;}
+    if(!user){const c=getGuestCount();const n=c+1;localStorage.setItem("np_guest_searches",String(n));setGuestSearches(n);}
+
     const apiMessages=[];
     messages.forEach(m=>{if(m.role==="user")apiMessages.push({role:"user",content:m.content});else if(m.result)apiMessages.push({role:"assistant",content:m.result.acknowledgment||""});});
     apiMessages.push({role:"user",content:q});
@@ -1079,31 +1079,23 @@ export default function App() {
         return updated;
       });
       recordSuccess(isFollowUp,q);
-      if(window.posthog)window.posthog.capture("search_completed",{query:q,is_follow_up:isFollowUp,pillar_count:(result.pillars||[]).length});
+      if(window.posthog)window.posthog.capture("search_completed",{query:q,is_follow_up:isFollowUp,pillar_count:(result.pillars||[]).length});if(window.tlTrack)window.tlTrack('feature_used',{feature:'search',is_follow_up:isFollowUp,pillar_count:(result.pillars||[]).length});
       fetchWeekPlan(q);
     }catch(e){setError("Something went wrong — please try your search again.");}finally{setLoading(false);}
   };
 
   const reset=()=>{setMessages([]);setError(null);setInput("");};
-  const handleCreditsAdded = async (credits, tierName) => {
-    if (!user) return;
-    const newCredits = (user.credits ?? 0) + credits;
-    const updated = { ...user, credits: newCredits, tier: tierName };
-    saveUser(updated); setUser(updated); userRef.current = updated;
-    // Persist to Supabase
-    if(user.id) await upsertProfile(user.id, { credits: newCredits, tier: tierName });
-    if(window.posthog)window.posthog.capture("payment_completed",{tier:tierName,credits_added:credits});
-  };
 
-  if(page==="pricing")return(<><style>{CSS}</style><PricingPage onBack={()=>setPage("home")} user={user} onCreditsAdded={handleCreditsAdded}/></>);
+
+
 
   return(
     <div style={{minHeight:"100vh",background:"#0b1a0d",color:"#e0ede2"}}>
       <style>{CSS}</style>
       {showAuth&&<AuthModal key={authMode} onClose={()=>setShowAuth(false)} onAuth={handleAuth} defaultMode={authMode}/>}
-      {showProfile&&user&&<ProfileModal user={user} onClose={()=>setShowProfile(false)} onUpdate={u=>{setUser(u);setShowProfile(false);}} onLogout={handleLogout} onUpgrade={()=>{setShowProfile(false);setPage("pricing");}}/>}
-      {showNoCredits&&<NoCreditsModal onClose={()=>setShowNoCredits(false)} onViewPlans={()=>{setShowNoCredits(false);setPage("pricing");}}/>}
-      {showSignUp&&<SignUpPrompt onClose={()=>setShowSignUp(false)} onSignUp={()=>{setShowSignUp(false);setAuthMode("signup");setShowAuth(true);}}/>}
+      {showProfile&&user&&<ProfileModal user={user} onClose={()=>setShowProfile(false)} onUpdate={u=>{setUser(u);setShowProfile(false);}} onLogout={handleLogout} onUpgrade={()=>{}}/>}
+
+      {showSignUp&&<SignUpPrompt onClose={()=>setShowSignUp(false)} onSignUp={()=>{setShowSignUp(false);setAuthMode("signup");setShowAuth(true);if(window.tlTrack)window.tlTrack("signup_started");}}/>}
       {showHistory && <HistoryModal onClose={()=>setShowHistory(false)} onLoad={(msgs)=>{setMessages(msgs);setInput("");setError(null);}}/>}
       <div style={{position:"fixed",inset:0,background:"#0b1a0d",zIndex:0,pointerEvents:"none"}}/>
       <div style={{position:"relative",zIndex:1,maxWidth:1100,margin:"0 auto",padding:"0 0 80px",overflowX:"hidden",minHeight:"100vh"}}>
@@ -1116,12 +1108,12 @@ export default function App() {
           </button>
           <div style={{display:"flex",gap:7,alignItems:"center"}}>
 
-            <button onClick={()=>setPage("pricing")} style={{background:"none",border:"1px solid rgba(80,180,100,.17)",borderRadius:20,padding:"clamp(6px,.7vw,9px) clamp(14px,1.6vw,22px)",color:"#2e5535",fontSize:"clamp(.82rem,1.2vw,.95rem)",cursor:"pointer"}}>Pricing</button>
+            
             {user && <button onClick={()=>setShowHistory(true)} style={{background:"none",border:"1px solid rgba(80,180,100,.17)",borderRadius:20,padding:"clamp(6px,.7vw,9px) clamp(14px,1.6vw,22px)",color:"#2e5535",fontSize:"clamp(.82rem,1.2vw,.95rem)",cursor:"pointer"}}>History</button>}
             {user
               ?<button onClick={()=>setShowProfile(true)} style={{background:"rgba(34,163,90,.1)",border:"1px solid rgba(34,163,90,.24)",borderRadius:20,padding:"4px 12px",color:"#4ec97a",fontSize:".78rem",cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
                 <span>👤 {user.name.split(" ")[0]}</span>
-                <span style={{background:"rgba(34,163,90,.18)",borderRadius:10,padding:"1px 7px",color:user.tier==="optimise"?"#4ec97a":(user.credits??0)<=1?"#f09090":(user.credits??0)<=2?"#ffc85a":"#4ec97a",fontSize:".76rem",fontWeight:600}}>{user.tier==="optimise"?"∞":(user.credits??0)+"cr"}</span>
+                
               </button>
               :<button onClick={()=>{setAuthMode("login");setShowAuth(true);}} style={{background:"linear-gradient(135deg,#22a35a,#1a7a44)",border:"none",borderRadius:20,padding:"5px 15px",color:"#e8f5eb",fontSize:".78rem",cursor:"pointer",fontWeight:600}}>Sign in</button>
             }
@@ -1159,7 +1151,7 @@ export default function App() {
               <ChipSection onQuery={handleQuery}/>
             </div>
             {!user&&<div style={{textAlign:"center",padding:"12px 0 8px"}}>
-              <button onClick={()=>{setAuthMode("signup");setShowAuth(true);}} style={{background:"linear-gradient(135deg,rgba(34,163,90,.18),rgba(34,163,90,.08))",border:"1px solid rgba(34,163,90,.4)",borderRadius:24,padding:"10px 28px",color:"#4ec97a",fontSize:".95rem",cursor:"pointer",fontFamily:"'Georgia',serif",fontWeight:600,letterSpacing:".02em",boxShadow:"0 2px 16px rgba(34,163,90,.15)",transition:"all .18s"}}>
+              <button onClick={()=>{setAuthMode("signup");setShowAuth(true);if(window.tlTrack)window.tlTrack("signup_started");}} style={{background:"linear-gradient(135deg,rgba(34,163,90,.18),rgba(34,163,90,.08))",border:"1px solid rgba(34,163,90,.4)",borderRadius:24,padding:"10px 28px",color:"#4ec97a",fontSize:".95rem",cursor:"pointer",fontFamily:"'Georgia',serif",fontWeight:600,letterSpacing:".02em",boxShadow:"0 2px 16px rgba(34,163,90,.15)",transition:"all .18s"}}>
                 ✦ Sign up free — get 3 credits
               </button>
             </div>}
@@ -1172,7 +1164,7 @@ export default function App() {
               {messages.map((msg,idx)=>(
                 <div key={idx} style={{marginBottom:msg.role==="user"?8:24,minHeight:0}}>
                   {msg.role==="user"&&<div style={{display:"flex",justifyContent:"flex-end"}}><div style={{display:"inline-block",background:"rgba(34,163,90,.14)",border:"1px solid rgba(34,163,90,.22)",borderRadius:"18px 18px 4px 18px",padding:"10px 16px",maxWidth:"82%",color:"#c8e8ce",fontSize:".88rem",lineHeight:1.6}}>{msg.content}</div></div>}
-                  {msg.role==="assistant"&&<ResultCard result={msg.result} isLast={idx===messages.length-1} onGetMore={()=>setPage("pricing")} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={idx}/>}
+                  {msg.role==="assistant"&&<ResultCard result={msg.result} isLast={idx===messages.length-1} onGetMore={()=>{}} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={idx}/>}
                 </div>
               ))}
               {loading&&<div style={{display:"flex",alignItems:"center",gap:10,padding:"24px 0",animation:"fadeIn .15s ease"}}><span style={{fontSize:22,display:"inline-block",animation:"spin 1.8s linear infinite"}}>🌿</span><span style={{color:"#4a9960",fontSize:"1rem",fontStyle:"italic",animation:"pulse 2s ease infinite"}}>Building your wellness plan...</span></div>}
@@ -1186,7 +1178,7 @@ export default function App() {
                   {(()=>{
                     if(user){const searches=messages.filter(m=>m.role==="user").length;const credDisplay=user.tier==="optimise"?"∞ unlimited":(user.credits??0)+" cr left";return searches+" search"+(searches!==1?"es":"")+" · "+credDisplay;}
                     const g=getGuestCount();
-                    if(g>=1)return <span style={{color:"#f09090",fontWeight:500,fontSize:".75rem"}}>No searches left — <button onClick={()=>{setAuthMode("signup");setShowAuth(true);}} style={{background:"none",border:"none",color:"#4ec97a",cursor:"pointer",fontFamily:"'Georgia',serif",fontSize:"inherit",padding:0,textDecoration:"underline"}}>sign up</button></span>;
+                    if(g>=1)return <span style={{color:"#f09090",fontWeight:500,fontSize:".75rem"}}>No searches left — <button onClick={()=>{setAuthMode("signup");setShowAuth(true);if(window.tlTrack)window.tlTrack("signup_started");}} style={{background:"none",border:"none",color:"#4ec97a",cursor:"pointer",fontFamily:"'Georgia',serif",fontSize:"inherit",padding:0,textDecoration:"underline"}}>sign up</button></span>;
                     return "1 free search · sign up for 3 credits";
                   })()}
                 </span>
