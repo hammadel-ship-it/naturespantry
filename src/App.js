@@ -167,45 +167,85 @@ const upsertProfile = async (supaId, fields) => {
 // ─── CONVERSATION HISTORY ─────────────────────────────────────────────────────
 
 const CONV_KEY = "np_conversations";
-const MAX_CONVS = 20;
+const MAX_CONVS = 500; // Keep full history — never truncate
 
-const loadConversations = () => { try { return JSON.parse(localStorage.getItem(CONV_KEY)||"[]"); } catch { return []; } };
-const saveConversationsLocal = (convs) => localStorage.setItem(CONV_KEY, JSON.stringify(convs));
+// ── Local cache (per-user key so different users on same browser don't mix) ──
+const localKey = (userId) => userId ? \`np_conv_\${userId}\` : "np_conv_guest";
 
-// Save conversations to Supabase for the logged-in user
+const loadConversationsLocal = (userId) => {
+  try { return JSON.parse(localStorage.getItem(localKey(userId))||"[]"); } catch { return []; }
+};
+const saveConversationsLocal = (convs, userId) => {
+  try { localStorage.setItem(localKey(userId), JSON.stringify(convs)); } catch(e) {}
+};
+// Legacy alias for HistoryModal which calls loadConversations()
+const loadConversations = (userId) => loadConversationsLocal(userId);
+
+// ── Merge two arrays by id, newest first, no duplicates ──────────────────────
+const mergeConvs = (a, b) => {
+  const map = new Map();
+  [...a, ...b].forEach(c => { if(c?.id) map.set(c.id, c); });
+  return Array.from(map.values()).sort((x,y) => y.date - x.date);
+};
+
+// ── Remote: Supabase as source of truth ──────────────────────────────────────
 const saveConversationsRemote = async (userId, convs) => {
+  if (!userId) return;
   try {
-    await supabase.from("profiles").update({ conversations: convs, updated_at: new Date().toISOString() }).eq("id", userId);
+    await supabase.from("profiles")
+      .update({ conversations: convs, updated_at: new Date().toISOString() })
+      .eq("id", userId);
   } catch(e) { console.error("Remote conv save failed:", e); }
 };
 
-// Load conversations from Supabase and merge with local
+// On login: pull remote, merge with any local (guest searches migrate too), save back
 const loadConversationsRemote = async (userId) => {
+  if (!userId) return loadConversationsLocal(null);
   try {
-    const { data } = await supabase.from("profiles").select("conversations").eq("id", userId).single();
-    if (data?.conversations?.length) {
-      saveConversationsLocal(data.conversations);
-      return data.conversations;
+    const { data } = await supabase.from("profiles")
+      .select("conversations")
+      .eq("id", userId)
+      .single();
+    const remote = Array.isArray(data?.conversations) ? data.conversations : [];
+    const local  = loadConversationsLocal(userId);
+    const guest  = loadConversationsLocal(null); // migrate any guest searches
+    const merged = mergeConvs(remote, mergeConvs(local, guest));
+    saveConversationsLocal(merged, userId);
+    if (guest.length) {
+      // Clear guest cache after migrating
+      try { localStorage.removeItem(localKey(null)); } catch(e) {}
+      // Push merged back to remote so guest searches are permanently saved
+      await saveConversationsRemote(userId, merged);
     }
-  } catch(e) { console.error("Remote conv load failed:", e); }
-  return loadConversations();
+    return merged;
+  } catch(e) {
+    console.error("Remote conv load failed:", e);
+    return loadConversationsLocal(userId);
+  }
 };
 
 const saveConversation = (messages, userId) => {
   if (!messages.length) return;
-  const convs = loadConversations();
+  const convs = loadConversationsLocal(userId);
   const firstUserMsg = messages.find(m=>m.role==="user");
-  const title = firstUserMsg ? firstUserMsg.content.slice(0,60) + (firstUserMsg.content.length>60?"…":"") : "Conversation";
-  const conv = { id: Date.now(), title, date: Date.now(), messages: messages.map(m=>({role:m.role,content:m.content,result:m.result||null})) };
-  const updated = [conv, ...convs].slice(0, MAX_CONVS);
-  saveConversationsLocal(updated);
+  const title = firstUserMsg
+    ? firstUserMsg.content.slice(0,60) + (firstUserMsg.content.length>60?"…":"")
+    : "Conversation";
+  const conv = {
+    id: Date.now(),
+    title,
+    date: Date.now(),
+    messages: messages.map(m=>({role:m.role,content:m.content,result:m.result||null}))
+  };
+  const updated = [conv, ...convs.filter(c=>c.id!==conv.id)].slice(0, MAX_CONVS);
+  saveConversationsLocal(updated, userId);
   if (userId) saveConversationsRemote(userId, updated);
   return conv.id;
 };
 
 const deleteConversation = (id, userId) => {
-  const convs = loadConversations().filter(c=>c.id!==id);
-  saveConversationsLocal(convs);
+  const convs = loadConversationsLocal(userId).filter(c=>c.id!==id);
+  saveConversationsLocal(convs, userId);
   if (userId) saveConversationsRemote(userId, convs);
 };
 
@@ -744,7 +784,7 @@ function WeekPlan({ plan }) {
 }
 
 function AckBubble({ text, label="A note for you" }) {
-  try { if(!text) return null; return(
+  try { if(!text) return <></>; return(
     <div style={{background:"linear-gradient(135deg,rgba(34,163,90,.1),rgba(20,80,40,.07))",border:"1px solid rgba(34,163,90,.22)",borderRadius:18,padding:"20px 24px",marginBottom:18,position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",top:14,right:16,fontSize:28,opacity:.08}}>🌿</div>
       <div style={{color:"#6aaa80",fontSize:".8rem",letterSpacing:".1em",textTransform:"uppercase",marginBottom:8}}>{label}</div>
@@ -1026,8 +1066,14 @@ function ResultCard({ result, isLast, onGetMore, activeRecipe, setActiveRecipe, 
   const recipes   = Array.isArray(result.recipes)  ? result.recipes.filter(Boolean)  : [];
   const tip       = result.tip || "";
 
-  // Nothing at all to show — skip silently
-  if (!ack && !pillars.length && !cards.length && !recipes.length && !tip) return null;
+  // If truly nothing — show a soft fallback instead of blank green
+  if (!ack && !pillars.length && !cards.length && !recipes.length && !tip) {
+    return (
+      <div style={{padding:"16px 20px",background:"rgba(34,163,90,.06)",borderRadius:12,border:"1px solid rgba(34,163,90,.15)",color:"#8fbe9f",fontSize:".95rem",lineHeight:1.6}}>
+        Your wellness plan is ready — scroll up to see your results.
+      </div>
+    );
+  }
 
   // Bulletproof type detection — content takes priority over responseType field
   const rawType = (result.responseType || "").toLowerCase().trim();
@@ -1239,7 +1285,7 @@ function ChipSection({ onQuery }) {
 // ─── HISTORY MODAL ────────────────────────────────────────────────────────────
 
 function HistoryModal({ onClose, onLoad }) {
-  const [convs, setConvs] = useState(loadConversations);
+  const [convs, setConvs] = useState(()=>loadConversations(currentUser?.id));
   const fmt = (ts) => {
     const d = new Date(ts), now = new Date();
     const diff = now - d;
@@ -1249,7 +1295,7 @@ function HistoryModal({ onClose, onLoad }) {
     if (diff < 604800000) return Math.floor(diff/86400000)+"d ago";
     return d.toLocaleDateString();
   };
-  const del = (id, e) => { e.stopPropagation(); deleteConversation(id, currentUser?.id); setConvs(loadConversations()); };
+  const del = (id, e) => { e.stopPropagation(); deleteConversation(id, currentUser?.id); setConvs(loadConversations(currentUser?.id)); };
   return (
     <Modal onClose={onClose} maxWidth={480}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
@@ -1372,8 +1418,8 @@ class SafeResult extends React.Component {
         <div style={{padding:"16px 20px",background:"rgba(34,163,90,.06)",borderRadius:12,border:"1px solid rgba(34,163,90,.2)",display:"flex",alignItems:"center",gap:12}}>
           <span style={{fontSize:20}}>⚠️</span>
           <div>
-            <div style={{color:"#a8d8b4",fontSize:".95rem",marginBottom:4}}>Could not display this result.</div>
-            <button onClick={()=>this.setState({hasError:false,errorMsg:""})} style={{background:"none",border:"none",color:"#4ec97a",fontSize:".85rem",cursor:"pointer",padding:0,textDecoration:"underline"}}>Try rendering again</button>
+            <div style={{color:"#a8d8b4",fontSize:".95rem",marginBottom:4}}>Something went wrong displaying this result.</div>
+            <button onClick={()=>this.setState({hasError:false,errorMsg:""})} style={{background:"none",border:"none",color:"#4ec97a",fontSize:".85rem",cursor:"pointer",padding:0,textDecoration:"underline"}}>Try again</button>
           </div>
         </div>
       );
@@ -1454,7 +1500,7 @@ function App() {
 
     // Listen for auth changes (e.g. password reset redirect)
     const {data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
-      if(event==="SIGNED_OUT"){clearUser();setUser(null);userRef.current=null;}
+      if(event==="SIGNED_OUT"){ const uid=userRef.current?.id; clearUser(); setUser(null); userRef.current=null; /* Don't clear user history — only remove from memory, Supabase retains it */ }
       if(event==="PASSWORD_RECOVERY"){
         // Open auth modal in reset mode so user can set new password
         setAuthMode("reset");
@@ -1611,7 +1657,7 @@ function App() {
 
 
 
-  return(
+  try { return(
     <div style={{minHeight:"100vh",background:"#0b1a0d",color:"#e0ede2"}}>
       <style>{CSS}</style>
       {showAuth&&<AuthModal key={authMode} onClose={()=>setShowAuth(false)} onAuth={handleAuth} defaultMode={authMode}/>}
@@ -1723,6 +1769,18 @@ function App() {
       </div>
     </div>
   );
+  } catch(appRenderErr) {
+    console.error("App render crash:", appRenderErr);
+    return (
+      <div style={{minHeight:"100vh",background:"#0b1a0d",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <div style={{textAlign:"center",padding:24}}>
+          <div style={{fontSize:48,marginBottom:16}}>🌿</div>
+          <div style={{color:"#c8ecd4",fontSize:"1.1rem",fontFamily:"Georgia,serif",marginBottom:16}}>Something went wrong. Please reload.</div>
+          <button onClick={()=>window.location.reload()} style={{background:"#22a35a",border:"none",borderRadius:10,padding:"10px 24px",color:"#fff",fontSize:"1rem",cursor:"pointer"}}>Reload</button>
+        </div>
+      </div>
+    );
+  }
 }
 
 export default function AppWithBoundary() {
