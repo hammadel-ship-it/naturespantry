@@ -712,6 +712,7 @@ function getImageUrl(name, pillarType, aiTerm) {
 
 function WeekPlan({ plan }) {
   const [active,setActive]=useState(null);
+  try {
   if(!Array.isArray(plan)||plan.length===0)return null;
   const rows=[["🥗","food","Food"],["💪","move","Move"],["🌬️","breathe","Breathe"],["🌙","sleep","Sleep"]];
   return(
@@ -739,19 +740,21 @@ function WeekPlan({ plan }) {
       )}
     </div>
   );
+  } catch(e) { console.error("WeekPlan crash",e); return null; }
 }
 
 function AckBubble({ text, label="A note for you" }) {
-  return(
+  try { if(!text) return null; return(
     <div style={{background:"linear-gradient(135deg,rgba(34,163,90,.1),rgba(20,80,40,.07))",border:"1px solid rgba(34,163,90,.22)",borderRadius:18,padding:"20px 24px",marginBottom:18,position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",top:14,right:16,fontSize:28,opacity:.08}}>🌿</div>
       <div style={{color:"#6aaa80",fontSize:".8rem",letterSpacing:".1em",textTransform:"uppercase",marginBottom:8}}>{label}</div>
       <p style={{color:"#b8e8c4",fontSize:"clamp(1.05rem,1.8vw,1.2rem)",lineHeight:1.85,margin:0,fontStyle:"italic"}}>{text}</p>
     </div>
-  );
+  ); } catch(e) { console.error("AckBubble crash",e); return null; }
 }
 
 function TipRow({ tip }) {
+  try {
   if(!tip)return null;
   return(
     <div style={{background:"linear-gradient(135deg,rgba(34,163,90,.1),rgba(20,100,55,.05))",border:"1px solid rgba(34,163,90,.22)",borderRadius:14,padding:"16px 20px",display:"flex",gap:12,alignItems:"flex-start",marginBottom:16}}>
@@ -762,6 +765,7 @@ function TipRow({ tip }) {
       </div>
     </div>
   );
+  } catch(e) { console.error("TipRow crash",e); return null; }
 }
 
 // ─── ITEM DETAIL MODAL ───────────────────────────────────────────────────────
@@ -769,7 +773,9 @@ function ItemDetailModal({ item, meta, pillarType, onClose, onDeepDive }) {
   const [imgErr, setImgErr] = useState(false);
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState(null);
-  const imgUrl = getImageUrl(item.name, pillarType, item.image);
+  if(!item || !meta || !onClose) return null;
+  const safeMeta = meta || PILLAR_META.food;
+  const imgUrl = getImageUrl((item.name||""), pillarType, item.image);
 
   const loadDetail = async () => {
     if (detail || loading) return;
@@ -873,6 +879,7 @@ function ItemDetailModal({ item, meta, pillarType, onClose, onDeepDive }) {
 
 function ItemCard({ item, meta, pillarType, onExpand }) {
   const [imgErr, setImgErr] = useState(false);
+  try {
   if (!item || !item.name) return null;
   const imgUrl = getImageUrl(item.name, pillarType, item.image);
   return(
@@ -892,9 +899,11 @@ function ItemCard({ item, meta, pillarType, onExpand }) {
       </div>
     </div>
   );
+  } catch(e) { console.error("ItemCard crash",e); return null; }
 }
 
 function PillarGrid({ pillars, onExpand }) {
+  try {
   if(!pillars?.length)return null;
   return(
     <div style={{marginBottom:18}}>
@@ -918,9 +927,11 @@ function PillarGrid({ pillars, onExpand }) {
       })}
     </div>
   );
+  } catch(e) { console.error("PillarGrid crash",e); return null; }
 }
 
 function RecipeList({ recipes, activeRecipe, setActiveRecipe, msgIdx }) {
+  try {
   if(!recipes?.length||!Array.isArray(recipes))return null;
   return(
     <div style={{marginBottom:18}}>
@@ -951,11 +962,13 @@ function RecipeList({ recipes, activeRecipe, setActiveRecipe, msgIdx }) {
       })}
     </div>
   );
+  } catch(e) { console.error("RecipeList crash",e); return null; }
 }
 
 // ─── VISUAL CARD GRID (for insight/answer follow-ups) ─────────────────────────
 function VisualCardCard({ card, onExpand }) {
   const [imgErr, setImgErr] = useState(false);
+  try {
   if (!card || !card.title) return null;
   const pillarKey = (card.pillar||"food").toLowerCase();
   const meta = PILLAR_META[pillarKey] || PILLAR_META.food;
@@ -984,15 +997,18 @@ function VisualCardCard({ card, onExpand }) {
       </div>
     </div>
   );
+  } catch(e) { console.error("VisualCardCard crash",e); return null; }
 }
 
 function VisualCardGrid({ cards, onExpand }) {
+  try {
   if (!cards?.length) return null;
   return (
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10,marginBottom:18}}>
       {(cards||[]).filter(c=>c&&c.title).map((card, i) => <VisualCardCard key={i} card={card} onExpand={onExpand}/>)}
     </div>
   );
+  } catch(e) { console.error("VisualCardGrid crash",e); return null; }
 }
 
 function ResultCard({ result, isLast, onGetMore, activeRecipe, setActiveRecipe, msgIdx, onAskFollowUp }) {
@@ -1000,94 +1016,109 @@ function ResultCard({ result, isLast, onGetMore, activeRecipe, setActiveRecipe, 
   const [expandedMeta, setExpandedMeta] = useState(null);
   const [expandedPillar, setExpandedPillar] = useState(null);
 
-  if(!result || typeof result !== "object") return null;
-  // Always render something — never silently swallow partial results
-  const hasAnything = result.acknowledgment || result.pillars?.length || result.cards?.length || result.recipes?.length || result.tip;
-  if(!hasAnything) return null;
+  // ── Hard guards — never crash ────────────────────────────────────────────
+  if (!result || typeof result !== "object") return null;
 
-  // Normalise responseType — handle casing, aliases, unexpected values
+  // Safely extract all fields with defaults
+  const ack       = String(result.acknowledgment || "");
+  const pillars   = Array.isArray(result.pillars)  ? result.pillars.filter(Boolean)  : [];
+  const cards     = Array.isArray(result.cards)    ? result.cards.filter(c => c && c.title) : [];
+  const recipes   = Array.isArray(result.recipes)  ? result.recipes.filter(Boolean)  : [];
+  const tip       = result.tip || "";
+
+  // Nothing at all to show — skip silently
+  if (!ack && !pillars.length && !cards.length && !recipes.length && !tip) return null;
+
+  // Bulletproof type detection — content takes priority over responseType field
   const rawType = (result.responseType || "").toLowerCase().trim();
-  const type = rawType === "items"   ? "items"
-             : rawType === "recipe"  ? "recipe"
-             : rawType === "insight" ? "insight"
-             : rawType === "answer"  ? "answer"
-             : (result.pillars?.length) ? "initial"
-             : (result.cards?.length)   ? "insight"
-             : (result.recipes?.length) ? "recipe"
-             : "initial";
-  const ack = result.acknowledgment || "";
+  let type;
+  if      (pillars.length > 0)                      type = rawType === "items" ? "items" : "initial";
+  else if (recipes.length > 0)                      type = "recipe";
+  else if (cards.length > 0)                        type = (rawType === "answer") ? "answer" : "insight";
+  else if (rawType === "items")                     type = "items";
+  else if (rawType === "recipe")                    type = "recipe";
+  else if (rawType === "insight" || rawType === "answer") type = rawType;
+  else                                              type = "initial";
 
   const handleExpand = (item, pillarType) => {
-    const meta = PILLAR_META[pillarType] || PILLAR_META.food;
-    setExpandedItem(item);
-    setExpandedMeta(meta);
-    setExpandedPillar(pillarType);
+    try {
+      const meta = PILLAR_META[(pillarType||"food")] || PILLAR_META.food;
+      setExpandedItem(item);
+      setExpandedMeta(meta);
+      setExpandedPillar(pillarType || "food");
+    } catch(e) { console.error("handleExpand error:", e); }
   };
 
   const handleDeepDive = (itemName) => {
-    setExpandedItem(null);
-    if(onAskFollowUp) onAskFollowUp(`Tell me more about ${itemName} — how to use it, when, how much, and what to combine it with`);
+    try {
+      setExpandedItem(null);
+      if (onAskFollowUp) onAskFollowUp("Tell me more about " + itemName + " — how to use it, when, how much, and what to combine it with");
+    } catch(e) { console.error("handleDeepDive error:", e); }
   };
 
-  const modal = expandedItem && expandedMeta && (
-    <ItemDetailModal
-      item={expandedItem}
-      meta={expandedMeta}
-      pillarType={expandedPillar}
-      onClose={()=>setExpandedItem(null)}
-      onDeepDive={handleDeepDive}
-    />
-  );
+  const modal = expandedItem && expandedMeta
+    ? <ItemDetailModal item={expandedItem} meta={expandedMeta} pillarType={expandedPillar} onClose={()=>setExpandedItem(null)} onDeepDive={handleDeepDive}/>
+    : null;
 
-  if(type==="initial") return(
+  // ── Safe renderer — every branch wrapped ─────────────────────────────────
+  const renderContent = () => {
+    try {
+      if (type === "initial" || type === "items") return (
+        <div>
+          {ack && <AckBubble text={ack} label={type === "items" ? "More for you" : undefined}/>}
+          {pillars.length > 0 && <PillarGrid pillars={pillars} onExpand={handleExpand}/>}
+          {recipes.length > 0 && <RecipeList recipes={recipes} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx}/>}
+          {cards.length  > 0 && <VisualCardGrid cards={cards} onExpand={handleExpand}/>}
+          <TipRow tip={tip}/>
+          {type === "initial" && isLast && <WeekPlan plan={result.weekPlan}/>}
+        </div>
+      );
+
+      if (type === "recipe") return (
+        <div>
+          {ack && <AckBubble text={ack} label="Here is how"/>}
+          {recipes.length > 0 && <RecipeList recipes={recipes} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx}/>}
+          {pillars.length > 0 && <PillarGrid pillars={pillars} onExpand={handleExpand}/>}
+          {cards.length  > 0 && <VisualCardGrid cards={cards} onExpand={handleExpand}/>}
+          <TipRow tip={tip}/>
+        </div>
+      );
+
+      if (type === "insight" || type === "answer") return (
+        <div>
+          {ack && <AckBubble text={ack} label={type === "insight" ? "Here is the deeper picture" : "To answer your question"}/>}
+          {cards.length  > 0 && <VisualCardGrid cards={cards} onExpand={handleExpand}/>}
+          {pillars.length > 0 && <PillarGrid pillars={pillars} onExpand={handleExpand}/>}
+          {recipes.length > 0 && <RecipeList recipes={recipes} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx}/>}
+          <TipRow tip={tip}/>
+        </div>
+      );
+
+      // Absolute fallback — render whatever we have
+      return (
+        <div>
+          {ack && <AckBubble text={ack}/>}
+          {pillars.length > 0 && <PillarGrid pillars={pillars} onExpand={handleExpand}/>}
+          {cards.length  > 0 && <VisualCardGrid cards={cards} onExpand={handleExpand}/>}
+          {recipes.length > 0 && <RecipeList recipes={recipes} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx}/>}
+          <TipRow tip={tip}/>
+        </div>
+      );
+    } catch(renderErr) {
+      console.error("ResultCard render error:", renderErr);
+      return (
+        <div style={{padding:"16px 20px",background:"rgba(34,163,90,.06)",borderRadius:12,border:"1px solid rgba(34,163,90,.2)"}}>
+          <div style={{color:"#a8d8b4",fontSize:".95rem",marginBottom:4}}>⚠️ Could not display this result.</div>
+          {ack && <div style={{color:"#6a9a78",fontSize:".9rem",lineHeight:1.6,fontStyle:"italic"}}>{ack}</div>}
+        </div>
+      );
+    }
+  };
+
+  return (
     <div style={{animation:"slideUp .3s ease"}}>
       {modal}
-      {ack && <AckBubble text={ack}/>}
-      <PillarGrid pillars={result.pillars||[]} onExpand={handleExpand}/>
-      <RecipeList recipes={result.recipes||[]} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx}/>
-      <TipRow tip={result.tip}/>
-      {isLast&&<WeekPlan plan={result.weekPlan}/>}
-    </div>
-  );
-
-  if(type==="items") return(
-    <div style={{animation:"slideUp .3s ease"}}>
-      {modal}
-      {ack && <AckBubble text={ack} label="More for you"/>}
-      <PillarGrid pillars={result.pillars||[]} onExpand={handleExpand}/>
-      <TipRow tip={result.tip}/>
-    </div>
-  );
-
-  if(type==="recipe") return(
-    <div style={{animation:"slideUp .3s ease"}}>
-      {modal}
-      {ack && <AckBubble text={ack} label="Here is how"/>}
-      <RecipeList recipes={result.recipes||[]} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx}/>
-      <TipRow tip={result.tip}/>
-    </div>
-  );
-
-  if(type==="insight"||type==="answer") {
-    const label = type==="insight" ? "Here is the deeper picture" : "To answer your question";
-    return(
-      <div style={{animation:"slideUp .3s ease"}}>
-        {modal}
-        {ack && <AckBubble text={ack} label={label}/>}
-        <VisualCardGrid cards={result.cards||[]} onExpand={handleExpand}/>
-        <TipRow tip={result.tip}/>
-      </div>
-    );
-  }
-
-  return(
-    <div style={{animation:"slideUp .3s ease"}}>
-      {modal}
-      {ack && <AckBubble text={ack} label="Here is what I found"/>}
-      {(result.pillars||[]).length>0 && <PillarGrid pillars={result.pillars||[]} onExpand={handleExpand}/>}
-      {(result.recipes||[]).length>0 && <RecipeList recipes={result.recipes||[]} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={msgIdx}/>}
-      {(result.cards||[]).length>0 && <VisualCardGrid cards={result.cards||[]} onExpand={handleExpand}/>}
-      <TipRow tip={result.tip}/>
+      {renderContent()}
     </div>
   );
 }
@@ -1483,23 +1514,55 @@ function App() {
     setMessages(p=>[...p,{role:"user",content:q}]);setInput("");setError(null);setLoading(true);
     // Repair a parsed result so it always has enough to render
     const repairResult = (r, q) => {
-      if (!r || typeof r !== "object") return null;
-      // Ensure acknowledgment always exists
-      if (!r.acknowledgment) r.acknowledgment = "Here is what I found for you.";
-      // Ensure responseType
-      if (!r.responseType) {
-        if (r.pillars?.length) r.responseType = "initial";
-        else if (r.cards?.length) r.responseType = "insight";
-        else if (r.recipes?.length) r.responseType = "recipe";
-        else r.responseType = "initial";
+      try {
+        if (!r || typeof r !== "object") {
+          return { responseType:"initial", acknowledgment:"Here are your recommendations.", pillars:[], cards:[], recipes:[], tip:"" };
+        }
+        // Ensure acknowledgment
+        if (!r.acknowledgment || typeof r.acknowledgment !== "string") r.acknowledgment = "Here is what I found for you.";
+        // Ensure arrays exist and are actual arrays
+        if (!Array.isArray(r.pillars))  r.pillars  = [];
+        if (!Array.isArray(r.cards))    r.cards    = [];
+        if (!Array.isArray(r.recipes))  r.recipes  = [];
+        // Clean pillars — ensure each has type, label, items array
+        r.pillars = r.pillars.filter(Boolean).map(p => ({
+          type:  String(p.type  || "food"),
+          label: String(p.label || ""),
+          items: Array.isArray(p.items) ? p.items.filter(Boolean).map(item => ({
+            name:    String(item.name    || ""),
+            benefit: String(item.benefit || ""),
+            emoji:   String(item.emoji   || "🌿"),
+            image:   String(item.image   || ""),
+          })).filter(item => item.name) : []
+        }));
+        // Clean cards — ensure each has title, body, pillar
+        r.cards = r.cards.filter(Boolean).map(c => ({
+          title:  String(c.title  || c.name || ""),
+          body:   String(c.body   || c.benefit || ""),
+          emoji:  String(c.emoji  || "🌿"),
+          pillar: String(c.pillar || "food"),
+          image:  String(c.image  || ""),
+        })).filter(c => c.title);
+        // Clean recipes
+        r.recipes = r.recipes.filter(Boolean).map(rec => ({
+          name:        String(rec.name  || "Recipe"),
+          emoji:       String(rec.emoji || "🍽️"),
+          ingredients: Array.isArray(rec.ingredients) ? rec.ingredients.filter(Boolean).map(String) : [],
+          steps:       Array.isArray(rec.steps)       ? rec.steps.filter(Boolean).map(String)       : [],
+        }));
+        // Ensure responseType
+        if (!r.responseType) {
+          if (r.pillars.length)       r.responseType = "initial";
+          else if (r.cards.length)    r.responseType = "insight";
+          else if (r.recipes.length)  r.responseType = "recipe";
+          else                        r.responseType = "initial";
+        }
+        r.tip = String(r.tip || "");
+        return r;
+      } catch(e) {
+        console.error("repairResult error:", e);
+        return { responseType:"initial", acknowledgment:"Here are your recommendations.", pillars:[], cards:[], recipes:[], tip:"" };
       }
-      // Ensure pillars array exists
-      if (!r.pillars) r.pillars = [];
-      // Ensure cards array exists
-      if (!r.cards) r.cards = [];
-      // Ensure each pillar has items array
-      (r.pillars||[]).forEach(p => { if(!p.items) p.items=[]; });
-      return r;
     };
 
     const attemptQuery = async (attempt=1) => {
@@ -1625,12 +1688,15 @@ function App() {
         <div style={{display: hasConvo ? "block" : "none"}}>
           <div style={{minHeight:"80vh",display:"flex",flexDirection:"column"}}>
             <div style={{padding:"16px 20px 0"}}>
-              {(messages||[]).map((msg,idx)=>{ if(!msg) return null; return (
-                <div key={idx} style={{marginBottom:msg.role==="user"?8:24,minHeight:0}}>
-                  {msg.role==="user"&&<div style={{display:"flex",justifyContent:"flex-end"}}><div style={{display:"inline-block",background:"rgba(34,163,90,.16)",border:"1px solid rgba(34,163,90,.28)",borderRadius:"20px 20px 5px 20px",padding:"14px 20px",maxWidth:"82%",color:"#d8f0de",fontSize:"1.05rem",lineHeight:1.7,fontWeight:500}}>{msg.content}</div></div>}
-                  {msg.role==="assistant"&&<SafeResult><ResultCard result={msg.result} isLast={idx===messages.length-1} onGetMore={()=>{}} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={idx} onAskFollowUp={(q)=>{setInput(q);setTimeout(()=>handleQuery(q),100);}}/></SafeResult>}
-                </div>
-              ))}
+              {(messages||[]).map((msg,idx)=>{
+                if(!msg) return null;
+                return (
+                  <div key={idx} style={{marginBottom:msg.role==="user"?8:24,minHeight:0}}>
+                    {msg.role==="user"&&<div style={{display:"flex",justifyContent:"flex-end"}}><div style={{display:"inline-block",background:"rgba(34,163,90,.16)",border:"1px solid rgba(34,163,90,.28)",borderRadius:"20px 20px 5px 20px",padding:"14px 20px",maxWidth:"82%",color:"#d8f0de",fontSize:"1.05rem",lineHeight:1.7,fontWeight:500}}>{msg.content}</div></div>}
+                    {msg.role==="assistant"&&<SafeResult><ResultCard result={msg.result} isLast={idx===messages.length-1} onGetMore={()=>{}} activeRecipe={activeRecipe} setActiveRecipe={setActiveRecipe} msgIdx={idx} onAskFollowUp={(q)=>{setInput(q);setTimeout(()=>handleQuery(q),100);}}/></SafeResult>}
+                  </div>
+                );
+              })}
               {loading&&<div style={{display:"flex",alignItems:"center",gap:10,padding:"24px 0",animation:"fadeIn .15s ease"}}><span style={{fontSize:22,display:"inline-block",animation:"spin 1.8s linear infinite"}}>🌿</span><span style={{color:"#6aaa80",fontSize:"1rem",fontStyle:"italic",animation:"pulse 2s ease infinite"}}>Building your wellness plan...</span></div>}
               {error&&<div style={{background:"rgba(200,60,60,.08)",border:"1px solid rgba(200,60,60,.18)",borderRadius:10,padding:"11px 15px",color:"#f09090",fontSize:".82rem",marginBottom:12,lineHeight:1.6}}>⚠️ {error}<button onClick={()=>setError(null)} style={{background:"none",border:"none",color:"#f09090",cursor:"pointer",float:"right",fontSize:".82rem"}}>✕</button></div>}
               <div ref={bottomRef}/>
