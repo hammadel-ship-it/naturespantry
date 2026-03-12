@@ -192,10 +192,10 @@ const mergeConvs = (a, b) => {
 const saveConversationsRemote = async (userId, convs) => {
   if (!userId) return;
   try {
-    await supabase.from("profiles")
-      .update({ conversations: convs, updated_at: new Date().toISOString() })
-      .eq("id", userId);
-  } catch(e) { console.error("Remote conv save failed:", e); }
+    const { error } = await supabase.from("profiles")
+      .upsert({ id: userId, conversations: convs, updated_at: new Date().toISOString() });
+    if (error) console.error("Remote conv save failed:", error.message);
+  } catch(e) { console.error("Remote conv save exception:", e); }
 };
 
 // On login: pull remote, merge with any local (guest searches migrate too), save back
@@ -408,7 +408,8 @@ function AuthModal({ onClose, onAuth, defaultMode="login" }) {
             name:name.trim(),
             allergies,
             credits:3,
-            tier:"free"
+            tier:"free",
+            conversations:[]
           });
           const u={id:data.user.id,name:name.trim(),email:email.trim(),allergies,credits:3,sex:"",history:[]};if(window.tlTrack)window.tlTrack('signup_completed',{plan:'free'});
           saveUser(u);onAuth(u);
@@ -1598,14 +1599,18 @@ function App() {
         if(profile){
           const u={id:session.user.id,name:profile.name,email:profile.email,allergies:profile.allergies||[],credits:profile.credits??3,tier:profile.tier||"free",sex:profile.sex||"",history:profile.history||[]};
           saveUser(u);setUser(u);userRef.current=u;
-          loadConversationsRemote(session.user.id).then(convs=>saveConversationsLocal(convs));
+          loadConversationsRemote(session.user.id).then(convs=>saveConversationsLocal(convs, session.user.id));
         }
       }
     });
 
     // Listen for auth changes (e.g. password reset redirect)
     const {data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
-      if(event==="SIGNED_OUT"){ const uid=userRef.current?.id; clearUser(); setUser(null); userRef.current=null; /* Don't clear user history — only remove from memory, Supabase retains it */ }
+      if(event==="SIGNED_IN"&&session?.user){
+        // Sync history whenever a sign-in is detected (covers OAuth, magic link, etc.)
+        loadConversationsRemote(session.user.id).then(convs=>saveConversationsLocal(convs, session.user.id));
+      }
+      if(event==="SIGNED_OUT"){ const uid=userRef.current?.id; clearUser(); setUser(null); userRef.current=null; }
       if(event==="PASSWORD_RECOVERY"){
         // Open auth modal in reset mode so user can set new password
         setAuthMode("reset");
@@ -1619,6 +1624,8 @@ function App() {
     setUser(u);userRef.current=u;setShowAuth(false);setShowSignUp(false);
     localStorage.removeItem("np_guest_searches");setGuestSearches(0);
     if(window.posthog){window.posthog.identify(u.email,{name:u.name,email:u.email});window.posthog.capture("signed_up");}
+    // Pull full history from Supabase on every login — merges remote + local + guest
+    if(u?.id) loadConversationsRemote(u.id).then(convs=>saveConversationsLocal(convs, u.id));
   };
   const handleLogout=()=>{setUser(null);userRef.current=null;setMessages([]);setShowProfile(false);};
 
