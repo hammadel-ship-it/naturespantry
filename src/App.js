@@ -1289,8 +1289,9 @@ function ChipSection({ onQuery }) {
 
 // ─── HISTORY MODAL ────────────────────────────────────────────────────────────
 
-function HistoryModal({ onClose, onLoad }) {
-  const [convs, setConvs] = useState(()=>loadConversations(currentUser?.id));
+function HistoryModal({ onClose, onLoad, user }) {
+  const uid = user?.id || null;
+  const [convs, setConvs] = useState(()=>loadConversations(uid));
   const fmt = (ts) => {
     const d = new Date(ts), now = new Date();
     const diff = now - d;
@@ -1300,7 +1301,7 @@ function HistoryModal({ onClose, onLoad }) {
     if (diff < 604800000) return Math.floor(diff/86400000)+"d ago";
     return d.toLocaleDateString();
   };
-  const del = (id, e) => { e.stopPropagation(); deleteConversation(id, currentUser?.id); setConvs(loadConversations(currentUser?.id)); };
+  const del = (id, e) => { e.stopPropagation(); deleteConversation(id, uid); setConvs(loadConversations(uid)); };
   return (
     <Modal onClose={onClose} maxWidth={480}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
@@ -1694,7 +1695,7 @@ function App() {
       {showProfile&&user&&<ProfileModal user={user} onClose={()=>setShowProfile(false)} onUpdate={u=>{setUser(u);setShowProfile(false);}} onLogout={handleLogout} onUpgrade={()=>{}}/>}
 
       {showSignUp&&<SignUpPrompt onClose={()=>setShowSignUp(false)} onSignUp={()=>{setShowSignUp(false);setAuthMode("signup");setShowAuth(true);if(window.tlTrack)window.tlTrack("signup_started");}}/>}
-      {showHistory && <HistoryModal onClose={()=>setShowHistory(false)} onLoad={(msgs)=>{setMessages(msgs);setInput("");setError(null);}}/>}
+      {showHistory && <HistoryModal onClose={()=>setShowHistory(false)} onLoad={(msgs)=>{setMessages(msgs);setInput("");setError(null);}} user={user}/>}
       <div style={{position:"fixed",inset:0,background:"#0b1a0d",zIndex:0,pointerEvents:"none"}}/>
       <div style={{position:"relative",zIndex:1,maxWidth:1100,margin:"0 auto",padding:"0 0 80px",overflowX:"hidden",minHeight:"100vh"}}>
 
