@@ -9,29 +9,29 @@ const supabase  = createClient(SUPA_URL, SUPA_KEY);
 // --- DATA ---------------------------------------------------------------------
 
 const SUGGESTIONS = [
-  { label:"Bloating",        emoji:"", pillar:"food",     query:"I have bloating and digestive discomfort" },
-  { label:"Low Immunity",    emoji:"", pillar:"food",     query:"I keep getting sick and want to boost my immunity" },
-  { label:"Inflammation",    emoji:"", pillar:"food",     query:"I have chronic inflammation and joint pain" },
-  { label:"Skin Glow",       emoji:"", pillar:"food",     query:"My skin looks dull and I want a natural glow" },
-  { label:"Stiff Joints",    emoji:"", pillar:"exercise", query:"My joints are stiff and I need gentle movement exercises" },
-  { label:"Back Pain",       emoji:"", pillar:"exercise", query:"I have chronic lower back pain and need strengthening exercises" },
-  { label:"Low Stamina",     emoji:"", pillar:"exercise", query:"I get out of breath easily and want to build stamina" },
-  { label:"Posture",         emoji:"", pillar:"exercise", query:"My posture is terrible from sitting at a desk all day" },
-  { label:"Anxiety",         emoji:"", pillar:"breath",   query:"I feel anxious and overwhelmed and need to calm my nervous system" },
-  { label:"Panic Attacks",   emoji:"", pillar:"breath",   query:"I get panic attacks and need breathing techniques to manage them" },
-  { label:"Brain Fog",       emoji:"", pillar:"breath",   query:"I have brain fog and cannot focus or think clearly" },
-  { label:"Overwhelm",       emoji:"", pillar:"breath",   query:"I feel completely overwhelmed and stressed, I need relief now" },
-  { label:"Can't Sleep",     emoji:"", pillar:"sleep",    query:"I have trouble falling asleep and lie awake for hours" },
-  { label:"Wake at 3am",     emoji:"", pillar:"sleep",    query:"I keep waking up at 3am and cannot get back to sleep" },
-  { label:"Low Energy",      emoji:"", pillar:"sleep",    query:"I feel tired and low on energy all day despite sleeping" },
-  { label:"Recovery",        emoji:"", pillar:"sleep",    query:"I train hard but never feel recovered, always sore and fatigued" },
+  { label:"Bloating",        emoji:"🌱", pillar:"food",     query:"I have bloating and digestive discomfort" },
+  { label:"Low Immunity",    emoji:"🛡️", pillar:"food",     query:"I keep getting sick and want to boost my immunity" },
+  { label:"Inflammation",    emoji:"🔥", pillar:"food",     query:"I have chronic inflammation and joint pain" },
+  { label:"Skin Glow",       emoji:"✨", pillar:"food",     query:"My skin looks dull and I want a natural glow" },
+  { label:"Stiff Joints",    emoji:"🦴", pillar:"exercise", query:"My joints are stiff and I need gentle movement exercises" },
+  { label:"Back Pain",       emoji:"💪", pillar:"exercise", query:"I have chronic lower back pain and need strengthening exercises" },
+  { label:"Low Stamina",     emoji:"🏃", pillar:"exercise", query:"I get out of breath easily and want to build stamina" },
+  { label:"Posture",         emoji:"🧍", pillar:"exercise", query:"My posture is terrible from sitting at a desk all day" },
+  { label:"Anxiety",         emoji:"🌬️", pillar:"breath",   query:"I feel anxious and overwhelmed and need to calm my nervous system" },
+  { label:"Panic Attacks",   emoji:"💨", pillar:"breath",   query:"I get panic attacks and need breathing techniques to manage them" },
+  { label:"Brain Fog",       emoji:"🧠", pillar:"breath",   query:"I have brain fog and cannot focus or think clearly" },
+  { label:"Overwhelm",       emoji:"🌊", pillar:"breath",   query:"I feel completely overwhelmed and stressed, I need relief now" },
+  { label:"Can't Sleep",     emoji:"🌙", pillar:"sleep",    query:"I have trouble falling asleep and lie awake for hours" },
+  { label:"Wake at 3am",     emoji:"⏰", pillar:"sleep",    query:"I keep waking up at 3am and cannot get back to sleep" },
+  { label:"Low Energy",      emoji:"⚡", pillar:"sleep",    query:"I feel tired and low on energy all day despite sleeping" },
+  { label:"Recovery",        emoji:"🛌", pillar:"sleep",    query:"I train hard but never feel recovered, always sore and fatigued" },
 ];
 
 const PILLAR_META = {
-  food:     { label:"Food & Nutrition",    color:"#22a35a", bg:"rgba(34,163,90,.12)",  border:"rgba(34,163,90,.3)",  icon:"" },
-  exercise: { label:"Exercise & Movement", color:"#4a9fd4", bg:"rgba(74,159,212,.12)", border:"rgba(74,159,212,.3)", icon:"" },
-  breath:   { label:"Breathwork & Stress", color:"#9b7fe8", bg:"rgba(155,127,232,.12)",border:"rgba(155,127,232,.3)",icon:"" },
-  sleep:    { label:"Sleep & Recovery",    color:"#5b9bd5", bg:"rgba(91,155,213,.12)", border:"rgba(91,155,213,.3)", icon:"" },
+  food:     { label:"Food & Nutrition",    color:"#22a35a", bg:"rgba(34,163,90,.12)",  border:"rgba(34,163,90,.3)",  icon:"🥗" },
+  exercise: { label:"Exercise & Movement", color:"#4a9fd4", bg:"rgba(74,159,212,.12)", border:"rgba(74,159,212,.3)", icon:"💪" },
+  breath:   { label:"Breathwork & Stress", color:"#9b7fe8", bg:"rgba(155,127,232,.12)",border:"rgba(155,127,232,.3)",icon:"🌬️" },
+  sleep:    { label:"Sleep & Recovery",    color:"#5b9bd5", bg:"rgba(91,155,213,.12)", border:"rgba(91,155,213,.3)", icon:"🌙" },
 };
 
 const ALLERGIES = ["Gluten","Dairy","Nuts","Soy","Eggs","Shellfish","Fish","Sesame"];
@@ -567,7 +567,7 @@ function ProfileModal({ user, onClose, onUpdate, onLogout, onUpgrade }) {
     }catch(e){alert("Error: "+e.message);}
     setPortalLoading(false);
   };
-  const SEX=[{value:"female",label:"Female",icon:""},{value:"male",label:"Male",icon:""}];
+  const SEX=[{value:"female",label:"Female",icon:"♀️"},{value:"male",label:"Male",icon:"♂️"}];
   return(
     <Modal onClose={onClose}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{color:"#a8ddb5",fontSize:"1.05rem"}}> {user.name}</span><button onClick={onClose} style={{background:"none",border:"none",color:"#6a9a78",cursor:"pointer",fontSize:"1.1rem"}}></button></div>
