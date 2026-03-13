@@ -167,7 +167,9 @@ const fetchProfile = async (supaId) => {
 
 // Upsert profile fields to Supabase
 const upsertProfile = async (supaId, fields) => {
-  await supabase.from("profiles").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", supaId);
+  const { error } = await supabase.from("profiles")
+    .upsert({ id: supaId, ...fields, updated_at: new Date().toISOString() });
+  if (error) console.error("upsertProfile failed:", error.message);
 };
 
 // --- CONVERSATION HISTORY -----------------------------------------------------
@@ -434,8 +436,8 @@ function AuthModal({ onClose, onAuth, defaultMode="login" }) {
           credits:profile?.credits??3,
           tier:profile?.tier||"free",
           sex:profile?.sex||"",
-          age:profile?.age||null,
-          weight:profile?.weight||null,
+          age:profile?.age??null,
+          weight:profile?.weight??null,
           history:profile?.history||[]
         };
         saveUser(u);onAuth(u);
@@ -542,15 +544,17 @@ function ProfileModal({ user, onClose, onUpdate, onLogout, onUpgrade }) {
   const [saving,setSaving]=useState(false);
   const [portalLoading,setPortalLoading]=useState(false);
   const toggle=(a)=>setAllergies(p=>p.includes(a)?p.filter(x=>x!==a):[...p,a]);
+  const [saved,setSaved]=useState(false);
   const save=async()=>{
-    setSaving(true);
+    setSaving(true);setSaved(false);
     const ageNum = age ? parseInt(age) : null;
     const weightNum = weight ? parseFloat(weight) : null;
     const u={...user,allergies,sex,age:ageNum,weight:weightNum};
     saveUser(u);
     if(user.id) await upsertProfile(user.id,{allergies,sex,age:ageNum,weight:weightNum});
+    setSaving(false);setSaved(true);
     onUpdate(u);
-    setSaving(false);
+    setTimeout(()=>setSaved(false),2000);
   };
   const logout=async()=>{
     await supabase.auth.signOut();
@@ -594,7 +598,7 @@ function ProfileModal({ user, onClose, onUpdate, onLogout, onUpgrade }) {
         <div style={{color:"#4a7a56",fontSize:".78rem",letterSpacing:".1em",textTransform:"uppercase",marginBottom:8}}>Food allergies</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{ALLERGIES.map(a=><button key={a} onClick={()=>toggle(a)} style={{background:allergies.includes(a)?"rgba(34,163,90,.22)":"rgba(255,255,255,.04)",border:"1px solid "+(allergies.includes(a)?"rgba(34,163,90,.55)":"rgba(255,255,255,.1)"),borderRadius:20,padding:"4px 11px",color:allergies.includes(a)?"#5ed880":"#4a7a56",fontSize:".84rem",cursor:"pointer",transition:"all .14s"}}>{a}</button>)}</div>
       </div>
-      <div style={{display:"flex",gap:9,marginBottom:9}}><button onClick={save} disabled={saving} className="cta-btn" style={{flex:1,background:"linear-gradient(135deg,#22a35a,#1a7a44)",border:"none",borderRadius:10,padding:"11px",color:"#e8f5eb",fontSize:".85rem",cursor:"pointer",fontWeight:600}}>{saving?"Saving":"Save"}</button><button onClick={logout} style={{background:"rgba(220,80,80,.08)",border:"1px solid rgba(220,80,80,.22)",borderRadius:10,padding:"11px 16px",color:"#f09090",fontSize:".85rem",cursor:"pointer"}}>Sign out</button></div>
+      <div style={{display:"flex",gap:9,marginBottom:9}}><button onClick={save} disabled={saving} className="cta-btn" style={{flex:1,background:"linear-gradient(135deg,#22a35a,#1a7a44)",border:"none",borderRadius:10,padding:"11px",color:"#e8f5eb",fontSize:".85rem",cursor:"pointer",fontWeight:600}}>{saving?"Saving...":(saved?"Saved ✓":"Save changes")}</button><button onClick={logout} style={{background:"rgba(220,80,80,.08)",border:"1px solid rgba(220,80,80,.22)",borderRadius:10,padding:"11px 16px",color:"#f09090",fontSize:".85rem",cursor:"pointer"}}>Sign out</button></div>
 
 
     </Modal>
@@ -1496,7 +1500,7 @@ function SignupGateModal({ onSignup, onLogin, onClose }) {
             <div style={{color:"#6a9a78",fontSize:".95rem",lineHeight:1.7}}>Create a free account to keep going  unlimited searches, saved history, and personalised plans.</div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:28}}>
-            {[["","Unlimited searches  always free"],["","Saved conversation history"],["","Personalised to your profile"],["","Weekly wellness plans"]].map(([icon,text],i)=>(
+            {[["✓","Unlimited searches — always free"],["✓","Saved conversation history"],["✓","Personalised to your profile"],["✓","Weekly wellness plans"]].map(([icon,text],i)=>(
               <div key={i} style={{display:"flex",alignItems:"center",gap:12,background:"rgba(34,163,90,.07)",border:"1px solid rgba(34,163,90,.15)",borderRadius:12,padding:"12px 16px"}}>
                 <span style={{fontSize:20}}>{icon}</span>
                 <span style={{color:"#a8d8b4",fontSize:".95rem"}}>{text}</span>
@@ -1621,7 +1625,19 @@ function App() {
       if(session?.user){
         const profile=await fetchProfile(session.user.id);
         if(profile){
-          const u={id:session.user.id,name:profile.name,email:profile.email,allergies:profile.allergies||[],credits:profile.credits??3,tier:profile.tier||"free",sex:profile.sex||"",age:profile.age||null,weight:profile.weight||null,history:profile.history||[]};
+          const cached = getUser(); // merge: Supabase wins, fall back to cached local values
+          const u={
+            id:session.user.id,
+            name:profile.name||cached?.name||"",
+            email:profile.email||cached?.email||"",
+            allergies:profile.allergies||cached?.allergies||[],
+            credits:profile.credits??cached?.credits??3,
+            tier:profile.tier||cached?.tier||"free",
+            sex:profile.sex||cached?.sex||"",
+            age:profile.age??cached?.age??null,
+            weight:profile.weight??cached?.weight??null,
+            history:profile.history||cached?.history||[]
+          };
           saveUser(u);setUser(u);userRef.current=u;
           loadConversationsRemote(session.user.id).then(convs=>saveConversationsLocal(convs, session.user.id));
         }
