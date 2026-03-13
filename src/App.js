@@ -157,7 +157,15 @@ Shape: [{"day":"Monday","focus":"word","food":"meal","move":"exercise with durat
 // Cache session in localStorage just for instant UI restore on reload
 const getUser   = () => { try { return JSON.parse(localStorage.getItem("np_user")||"null"); } catch { return null; } };
 const saveUser  = (u) => localStorage.setItem("np_user", JSON.stringify(u));
-const clearUser = () => localStorage.removeItem("np_user");
+const clearUser = () => {
+  // Only remove auth session — preserve profile prefs (age/weight/sex) across sign-out
+  const u = getUser();
+  if (u?.email) {
+    try { localStorage.setItem("np_prefs_" + u.email, JSON.stringify({age:u.age,weight:u.weight,sex:u.sex,allergies:u.allergies})); } catch(e) {}
+  }
+  localStorage.removeItem("np_user");
+};
+const getPrefs = (email) => { try { return JSON.parse(localStorage.getItem("np_prefs_" + email)||"{}"); } catch { return {}; } };
 
 // Fetch full profile from Supabase (credits, allergies, sex, history)
 const fetchProfile = async (supaId) => {
@@ -428,16 +436,17 @@ function AuthModal({ onClose, onAuth, defaultMode="login" }) {
         if(error)return setErr(error.message);
         // Fetch full profile
         const profile=await fetchProfile(data.user.id);
+        const prefs = getPrefs(email.trim()); // survives sign-out
         const u={
           id:data.user.id,
           name:profile?.name||data.user.user_metadata?.name||email.split("@")[0],
           email:email.trim(),
-          allergies:profile?.allergies||[],
+          allergies:profile?.allergies?.length ? profile.allergies : (prefs.allergies||[]),
           credits:profile?.credits??3,
           tier:profile?.tier||"free",
-          sex:profile?.sex||"",
-          age:profile?.age??null,
-          weight:profile?.weight??null,
+          sex:profile?.sex||prefs.sex||"",
+          age:profile?.age??prefs.age??null,
+          weight:profile?.weight??prefs.weight??null,
           history:profile?.history||[]
         };
         saveUser(u);onAuth(u);
@@ -551,6 +560,8 @@ function ProfileModal({ user, onClose, onUpdate, onLogout, onUpgrade }) {
     const weightNum = weight ? parseFloat(weight) : null;
     const u={...user,allergies,sex,age:ageNum,weight:weightNum};
     saveUser(u);
+    // Persist prefs under email key so they survive sign-out
+    try { localStorage.setItem("np_prefs_" + u.email, JSON.stringify({age:ageNum,weight:weightNum,sex,allergies})); } catch(e) {}
     if(user.id) await upsertProfile(user.id,{allergies,sex,age:ageNum,weight:weightNum});
     setSaving(false);setSaved(true);
     onUpdate(u);
@@ -1625,17 +1636,18 @@ function App() {
       if(session?.user){
         const profile=await fetchProfile(session.user.id);
         if(profile){
-          const cached = getUser(); // merge: Supabase wins, fall back to cached local values
+          const cached = getUser();
+          const prefs = getPrefs(profile.email); // survives sign-out
           const u={
             id:session.user.id,
             name:profile.name||cached?.name||"",
             email:profile.email||cached?.email||"",
-            allergies:profile.allergies||cached?.allergies||[],
+            allergies:profile.allergies?.length ? profile.allergies : (prefs.allergies||cached?.allergies||[]),
             credits:profile.credits??cached?.credits??3,
             tier:profile.tier||cached?.tier||"free",
-            sex:profile.sex||cached?.sex||"",
-            age:profile.age??cached?.age??null,
-            weight:profile.weight??cached?.weight??null,
+            sex:profile.sex||prefs.sex||cached?.sex||"",
+            age:profile.age??prefs.age??cached?.age??null,
+            weight:profile.weight??prefs.weight??cached?.weight??null,
             history:profile.history||cached?.history||[]
           };
           saveUser(u);setUser(u);userRef.current=u;
